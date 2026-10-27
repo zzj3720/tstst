@@ -238,9 +238,10 @@ type ParsePrimary<T> =
     : ParseType<R> extends [infer A, [[")", ")"], ...infer R2]] ? [A, R2] : never
   : T extends [["[", "["], ...infer R] ? ParseTuple<R>
   : T extends [["{", "{"], ...infer R] ? ParseObj<R>
+  // (the constraint is a type without conditionals, `0 | 1` too)
   : T extends [["id", "infer"], ["id", infer N extends string], ...infer R]
     ? R extends [["id", "extends"], ...infer R2]
-      ? ParseOp<R2> extends [infer C, infer R3] ? [["infer", N, C], R3] : never
+      ? ParseUnion<R2> extends [infer C, infer R3] ? [["infer", N, C], R3] : never
       : [["infer", N, null], R]
   : T extends [["id", infer K extends Keyword], ...infer R] ? [["kw", K], R]
   : T extends [["id", infer NS extends string], [".", "."], ["id", infer N extends string], ...infer R]
@@ -405,8 +406,10 @@ type Binders<X, P extends string> =
   : X extends ["idx", infer A, infer K] ? [...Binders<A, `${P}.0`>, ...Binders<K, `${P}.1`>]
   : X extends ["ref", string, infer As extends any[]] ? BindersList<As, P>
   : [];
-type BindersList<Xs extends any[], P extends string, I extends 0[] = []> =
-  Xs extends [infer A, ...infer R] ? [...Binders<A, `${P}.${I["length"]}`>, ...BindersList<R, P, [...I, 0]>] : [];
+// (front to back: each step appends to what it was given, in place; a step
+// returning the rest's binders it then prefixes copies them at every element)
+type BindersList<Xs extends any[], P extends string, I extends 0[] = [], Acc extends any[] = []> =
+  Xs extends [infer A, ...infer R] ? BindersList<R, P, [...I, 0], [...Acc, ...Binders<A, `${P}.${I["length"]}`>]> : Acc;
 
 // the slot of the binder at path Q
 type BinderSlot<C extends Ctx, Q extends string> =
@@ -1026,7 +1029,7 @@ type NsPairs<In, P extends string, Is extends any[], Acc extends any[] = []> =
     : Acc;
 type Prefixed<Ps extends any[], NS extends string> = { [K in keyof Ps]: [`${NS}.${Ps[K][0] & string}`, Ps[K][1]] };
 type NamesOf<Files> = InfoOf<Files> extends infer In ? { [P in keyof In]: FileNames<In, P & string> } : never;
-type AllDecls<Files> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? [...Ds, ...AllDecls<R>] : [];
+type AllDecls<Files, Acc extends Decl[] = []> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? AllDecls<R, [...Acc, ...Ds]> : Acc;
 
 type Main<Pack extends string = ""> =
   ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
