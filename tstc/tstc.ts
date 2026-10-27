@@ -710,16 +710,20 @@ entry:
 // happen again (as the MoonBit tstc plans its memo). The least fixed point
 // of "calls one of them", from the natives.
 type EffectNatives = "hget" | "hset" | "hgetf" | "hsetf" | "hgets" | "hsets" | "halloc" | "hinit" | "hcopy" | "hloadt" | "hstoret" | "salloc" | "sappend" | "sappendv" | "scopy" | "sclear" | "sswap" | "bytes2s" | "ptrstr" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "bstr" | "bappend" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "clock_ms" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step";
-type EffectSet<Ds extends Decl[], Names extends FileTables> = EffectStep<Ds, Names, Flat<EffSeed<Ds> & NoEff>>;
+type EffectSet<Ds extends Decl[], Names extends FileTables> = EffectStep<Ds, Names, TableOf<[...EffSeed<Ds>, [string, 0 | 1]]>>;
 // (an effect set reads 1 for its names and 0 | 1 for the others: a test is
 // one property access)
 type NoEff = { [k: string]: 0 | 1 };
-type EffSeed<Ds extends Decl[]> = { [I in keyof Ds as I extends `${number}` ? (IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never) : never]: 1 };
+type EffSeed<Ds extends Decl[]> = { [I in keyof Ds]: IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? [Ds[I][0], 1] : [never, never]) : [never, never] };
+// each step: the aliases in E or calling one in it, until none is new
 type EffectStep<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
-  EffNew<Ds, Names, E> extends infer N ? ([keyof N] extends [never] ? E : EffectStep<Ds, Names, Flat<E & N>>) : never;
-// the aliases not in E that call one in it
-type EffNew<Ds extends Decl[], Names extends FileTables, E extends NoEff> = { [I in keyof Ds as I extends `${number}` ? (
-    E[Ds[I][0]] extends 1 ? never : true extends HasEff<Callees<Ds[I], Names>, E> ? Ds[I][0] : never) : never]: 1 };
+  EffFlags<Ds, Names, E> extends infer F extends any[]
+    ? (2 extends F[number] ? EffectStep<Ds, Names, TableOf<[...EffPairs<Ds, F>, [string, 0 | 1]]>> : E)
+    : never;
+// per alias: 1 in E, 2 calls one in E (new), 0 neither
+type EffFlags<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
+  { [I in keyof Ds]: E[Ds[I][0]] extends 1 ? 1 : true extends HasEff<Callees<Ds[I], Names>, E> ? 2 : 0 };
+type EffPairs<Ds extends Decl[], F extends any[]> = { [I in keyof Ds]: F[I & keyof F] extends 0 ? [never, never] : [Ds[I][0], 1] };
 type HasEff<Cs, E extends NoEff> = Cs extends string ? (E[Cs] extends 1 ? true : false) : false;
 // the aliases a declaration's body names, as its file resolves them
 // (the file's table as it is: an intersection with another object would
@@ -982,34 +986,37 @@ type ParseAll<Fs extends [string, string][], I extends 0[] = []> =
 // it by identity, not through every declaration's body)
 type InfoOf<Files> = {
   [I in keyof Files as I extends `${number}` ? (Files[I] extends [infer P extends string, any, any, any] ? P : never) : never]:
-    Files[I] extends [string, infer Ds extends Decl[], infer Is, infer Rs] ? [LocalNames<Ds>, Is, Rs] : never };
-// what a file exports: its aliases and what it re-exports, by name
-type Exports<In, P extends string> =
-  P extends keyof In ? (In[P] extends [infer L, any, infer Rs extends any[]] ? Flat<L & ReexportNames<In, P, Rs>> : {}) : {};
-type LocalNames<Ds extends Decl[]> =
-  { [I in keyof Ds as I extends `${number}` ? ShortName<Ds[I][0]> : never]: Ds[I][0] };
+    Files[I] extends [string, infer Ds extends Decl[], infer Is, infer Rs] ? [LocalPairs<Ds>, Is, Rs] : never };
+// Name tables: [name, global name] pairs made into one object by one mapped
+// type (a property per pair, read through its pair: no intersection to merge
+// at every lookup), with an index signature of the default (a last pair
+// [string, D]) so that a lookup is one property access
+type TableOf<Pairs extends any[]> = { [I in keyof Pairs as I extends `${number}` ? Pairs[I][0] : never]: Pairs[I][1] };
+type LocalPairs<Ds extends Decl[]> = { [I in keyof Ds]: [ShortName<Ds[I][0]>, Ds[I][0]] };
 type ShortName<N> = N extends `${string}:${infer S}` ? S : N;
-type ReexportNames<In, P extends string, Rs extends any[]> =
-  { [I in keyof Rs as I extends `${number}` ? Rs[I][0] : never]: Exported<In, ResolvePath<P, Rs[I][2]>, Rs[I][1]> };
-type Exported<In, P extends string, N> = Exports<In, P> extends infer E ? N extends keyof E ? E[N] : never : never;
+// what a file exports, as pairs: its aliases and what it re-exports
+type ExportPairs<In, P extends string> =
+  P extends keyof In ? (In[P] extends [infer L extends any[], any, infer Rs extends any[]] ? [...L, ...ReexportPairs<In, P, Rs>] : []) : [];
+type ReexportPairs<In, P extends string, Rs extends any[]> =
+  { [I in keyof Rs]: [Rs[I][0], Exported<In, ResolvePath<P, Rs[I][2]>, Rs[I][1]>] };
+type Exports<In, P extends string> = TableOf<[...ExportPairs<In, P>, [string, ""]]>;
+type Exported<In, P extends string, N> = Exports<In, P>[N & string] extends infer V ? (V extends "" ? never : V) : never;
 // the names a file sees: its own aliases, its imports, a namespace's members as `ns.name`
 type FileNames<In, P extends string> =
-  P extends keyof In ? (In[P] extends [infer L, infer Is extends any[], any] ? Flat<L & NamedImports<In, P, Is> & NsImports<In, P, Is> & NoNames> : NoNames) : NoNames;
+  P extends keyof In ? (In[P] extends [infer L extends any[], infer Is extends any[], any]
+    ? TableOf<[...L, ...NamedPairs<In, P, Is>, ...NsPairs<In, P, Is>, [string, string]]> : NoNames) : NoNames;
 // (a name table has an index signature of string: a name it lacks reads as
 // string, so a lookup is one property access, not a test against keyof of
 // every name)
 type NoNames = { [k: string]: string };
 type Lookup<M extends NoNames, N> = M[N & string] extends infer V ? (V extends string ? (string extends V ? N : V) : N) : N;
-type NamedImports<In, P extends string, Is extends any[]> =
-  { [I in keyof Is as I extends `${number}` ? (Is[I] extends ["named", infer L, any, any] ? L : never) : never]:
-      Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<In, ResolvePath<P, Spec>, Im> : never };
-// (a namespace's members as `ns.name`: few namespaces, so an intersection)
-type NsImports<In, P extends string, Is extends any[], Acc = {}> =
+type NamedPairs<In, P extends string, Is extends any[]> =
+  { [I in keyof Is]: Is[I] extends ["named", infer L, infer Im, infer Spec extends string] ? [L, Exported<In, ResolvePath<P, Spec>, Im>] : [never, never] };
+type NsPairs<In, P extends string, Is extends any[], Acc extends any[] = []> =
   Is extends [infer I, ...infer R extends any[]]
-    ? NsImports<In, P, R, I extends ["ns", infer NS extends string, infer Spec extends string]
-        ? Acc & (Exports<In, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never)
-        : Acc>
+    ? NsPairs<In, P, R, I extends ["ns", infer NS extends string, infer Spec extends string] ? [...Acc, ...Prefixed<ExportPairs<In, ResolvePath<P, Spec>>, NS>] : Acc>
     : Acc;
+type Prefixed<Ps extends any[], NS extends string> = { [K in keyof Ps]: [`${NS}.${Ps[K][0] & string}`, Ps[K][1]] };
 type NamesOf<Files> = InfoOf<Files> extends infer In ? { [P in keyof In]: FileNames<In, P & string> } : never;
 type AllDecls<Files> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? [...Ds, ...AllDecls<R>] : [];
 
