@@ -25929,7 +25929,7 @@ export type Fa8cpq8<H, P0, P1, P2> =
   [H1] : X1 : 0 : 
   g.ta2<P1, 375672734n, null> extends [infer t27_0, infer t27_1] ?
   t27_1 extends true ? 
-  g.panic<"unsupported: GOROOT/src/fmt/print.go:705:48: conversion complex64 -> complex128"> extends infer t30 ?
+  g.panic<"unsupported: fmt/print.go:705:48: conversion complex64 -> complex128"> extends infer t30 ?
   Ftzzn76<H, P0, P1, [0n, null, 0n], t30, 64n, P2> extends infer X1 ?
   X1 extends [infer H1] ?
   
@@ -716528,23 +716528,23 @@ export type Fdrszr2<H> =
   g.halloc<H, [0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, null, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n], 1n>;
 
 /** github.com/zeebo/xxh3.accumAVX2 */
-export type F99285k<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:18:6: function without body: github.com/zeebo/xxh3.accumAVX2">;
+export type F99285k<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:18:6: function without body: github.com/zeebo/xxh3.accumAVX2">;
 
 /** github.com/zeebo/xxh3.accumAVX512 */
-export type Fc8l914<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:21:6: function without body: github.com/zeebo/xxh3.accumAVX512">;
+export type Fc8l914<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:21:6: function without body: github.com/zeebo/xxh3.accumAVX512">;
 
 /** github.com/zeebo/xxh3.accumBlockAVX2 */
-export type Fv5ewek<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:27:6: function without body: github.com/zeebo/xxh3.accumBlockAVX2">;
+export type Fv5ewek<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:27:6: function without body: github.com/zeebo/xxh3.accumBlockAVX2">;
 
 /** github.com/zeebo/xxh3.accumBlockAVX512 */
-export type F4ihulv<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:30:6: function without body: github.com/zeebo/xxh3.accumBlockAVX512">;
+export type F4ihulv<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:30:6: function without body: github.com/zeebo/xxh3.accumBlockAVX512">;
 
 /** github.com/zeebo/xxh3.accumBlockNEON */
 export type Fncj5zt<H, P0, P1, P2> =
   g.gpanic<H, [348925112n, "unreachable"]>;
 
 /** github.com/zeebo/xxh3.accumBlockSSE */
-export type Fjc3ejz<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:33:6: function without body: github.com/zeebo/xxh3.accumBlockSSE">;
+export type Fjc3ejz<H, P0, P1, P2> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:33:6: function without body: github.com/zeebo/xxh3.accumBlockSSE">;
 
 /** github.com/zeebo/xxh3.accumBlockScalar */
 export type Fmegsom<H, P0, P1, P2> =
@@ -717340,7 +717340,7 @@ export type Fg4wui7<H, P0, P1, P2, P3> =
   g.gpanic<H, [348925112n, "unreachable"]>;
 
 /** github.com/zeebo/xxh3.accumSSE */
-export type Fnmmsx6<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3@v1.1.0/accum_stubs_amd64.go:24:6: function without body: github.com/zeebo/xxh3.accumSSE">;
+export type Fnmmsx6<H, P0, P1, P2, P3> = g.panic<"unsupported: github.com/zeebo/xxh3/accum_stubs_amd64.go:24:6: function without body: github.com/zeebo/xxh3.accumSSE">;
 
 /** github.com/zeebo/xxh3.accumScalar */
 export type Fel9w47<H, P0, P1, P2, P3> =
@@ -727385,10 +727385,10 @@ type F8etpln_5<H, t16, t17> =
   Far6fh5<H, t16, t20, t17> : 0 : 0;
 
 /** hash/crc32.castagnoliSSE42 */
-export type Fmn48x7<H, P0, P1> = g.panic<"unsupported: GOROOT/src/hash/crc32/crc32_amd64.go:28:6: function without body: hash/crc32.castagnoliSSE42">;
+export type Fmn48x7<H, P0, P1> = g.panic<"unsupported: hash/crc32/crc32_amd64.go:28:6: function without body: hash/crc32.castagnoliSSE42">;
 
 /** hash/crc32.castagnoliSSE42Triple */
-export type Flpgpd4<H, P0, P1, P2, P3, P4, P5, P6> = g.panic<"unsupported: GOROOT/src/hash/crc32/crc32_amd64.go:34:6: function without body: hash/crc32.castagnoliSSE42Triple">;
+export type Flpgpd4<H, P0, P1, P2, P3, P4, P5, P6> = g.panic<"unsupported: hash/crc32/crc32_amd64.go:34:6: function without body: hash/crc32.castagnoliSSE42Triple">;
 
 /** hash/crc32.castagnoliShift */
 export type F8ao9ld<H, P0, P1> =
@@ -727412,7 +727412,7 @@ export type F8ao9ld<H, P0, P1> =
   [H, X1] : 0 : 0 : 0 : G_rtp<H, t16> : 0 : 0 : 0 : G_rtp<H, t10> : 0 : 0 : 0 : G_rtp<H, t4> : 0 : 0 : 0 : G_rtp<H, t0> : 0;
 
 /** hash/crc32.ieeeCLMUL */
-export type Fmejnap<H, P0, P1> = g.panic<"unsupported: GOROOT/src/hash/crc32/crc32_amd64.go:44:6: function without body: hash/crc32.ieeeCLMUL">;
+export type Fmejnap<H, P0, P1> = g.panic<"unsupported: hash/crc32/crc32_amd64.go:44:6: function without body: hash/crc32.ieeeCLMUL">;
 
 /** hash/crc32.init */
 export type Fy7h48t<H> =
@@ -727725,10 +727725,10 @@ export type Fpuqg1x<H, P0> = [H, P0];
 
 
 /** internal/abi.FuncPCABI0 */
-export type F5skjn7<H, P0> = g.panic<"unsupported: GOROOT/src/internal/abi/funcpc.go:22:6: function without body: internal/abi.FuncPCABI0">;
+export type F5skjn7<H, P0> = g.panic<"unsupported: internal/abi/funcpc.go:22:6: function without body: internal/abi.FuncPCABI0">;
 
 /** internal/abi.FuncPCABIInternal */
-export type Fqj2ec<H, P0> = g.panic<"unsupported: GOROOT/src/internal/abi/funcpc.go:31:6: function without body: internal/abi.FuncPCABIInternal">;
+export type Fqj2ec<H, P0> = g.panic<"unsupported: internal/abi/funcpc.go:31:6: function without body: internal/abi.FuncPCABIInternal">;
 
 
 /** internal/abi.TypeFor[internal/poll.splicePipe] */
@@ -728205,7 +728205,7 @@ export type Fc8tac7<H, P0> =
 
 
 /** internal/chacha8rand.block */
-export type Fwk18i5<H, P0, P1, P2> = g.panic<"unsupported: GOROOT/src/internal/chacha8rand/chacha8.go:30:6: function without body: internal/chacha8rand.block">;
+export type Fwk18i5<H, P0, P1, P2> = g.panic<"unsupported: internal/chacha8rand/chacha8.go:30:6: function without body: internal/chacha8rand.block">;
 
 
 /** internal/filepathlite.Base */
@@ -729746,7 +729746,7 @@ export type Fyqsq1z<H> =
   [H, t0] : 0;
 
 /** internal/runtime/gc/scan.FilterNilAVX512 */
-export type F4k4mdr<H, P0, P1> = g.panic<"unsupported: GOROOT/src/internal/runtime/gc/scan/filter_amd64.go:9:6: function without body: internal/runtime/gc/scan.FilterNilAVX512">;
+export type F4k4mdr<H, P0, P1> = g.panic<"unsupported: internal/runtime/gc/scan/filter_amd64.go:9:6: function without body: internal/runtime/gc/scan.FilterNilAVX512">;
 
 
 /** internal/runtime/gc/scan.ScanSpanPacked */
@@ -729765,7 +729765,7 @@ export type F1x12w4<H, P0, P1, P2, P3, P4> =
   F4k4mdr<H1, P1, t0> : X1 : 0;
 
 /** internal/runtime/gc/scan.scanSpanPackedAVX512 */
-export type Fgeban9<H, P0, P1, P2, P3, P4> = g.panic<"unsupported: GOROOT/src/internal/runtime/gc/scan/scan_amd64.go:35:6: function without body: internal/runtime/gc/scan.scanSpanPackedAVX512">;
+export type Fgeban9<H, P0, P1, P2, P3, P4> = g.panic<"unsupported: internal/runtime/gc/scan/scan_amd64.go:35:6: function without body: internal/runtime/gc/scan.scanSpanPackedAVX512">;
 
 /** internal/runtime/maps.MemHash */
 export type F3pi7j1<H, P0, P1, P2> =
@@ -729781,7 +729781,7 @@ export type F1txr7g<H, P0, P1> =
   [H, t2] : 0 : 0;
 
 /** internal/runtime/maps.memHashAES */
-export type F1ih2kj<H, P0, P1, P2> = g.panic<"unsupported: GOROOT/src/internal/runtime/maps/memhash_aes_asm.go:18:6: function without body: internal/runtime/maps.memHashAES">;
+export type F1ih2kj<H, P0, P1, P2> = g.panic<"unsupported: internal/runtime/maps/memhash_aes_asm.go:18:6: function without body: internal/runtime/maps.memHashAES">;
 
 /** internal/runtime/maps.memHashFallback */
 export type Fi6j086<H, P0, P1, P2> =
@@ -730152,10 +730152,10 @@ export type F9gi64u<H, P0> =
 
 
 /** internal/runtime/sys.GetCallerPC */
-export type Fu7l1h1<H> = g.panic<"unsupported: GOROOT/src/internal/runtime/sys/intrinsics.go:233:6: function without body: internal/runtime/sys.GetCallerPC">;
+export type Fu7l1h1<H> = g.panic<"unsupported: internal/runtime/sys/intrinsics.go:233:6: function without body: internal/runtime/sys.GetCallerPC">;
 
 /** internal/runtime/sys.GetCallerSP */
-export type Fu7sl6d<H> = g.panic<"unsupported: GOROOT/src/internal/runtime/sys/intrinsics.go:235:6: function without body: internal/runtime/sys.GetCallerSP">;
+export type Fu7sl6d<H> = g.panic<"unsupported: internal/runtime/sys/intrinsics.go:235:6: function without body: internal/runtime/sys.GetCallerSP">;
 
 /** internal/runtime/sys.LeadingZeros64 */
 export type F699a7c<H, P0> =
@@ -734463,7 +734463,7 @@ export type Fb0mk7i<H, P0> =
 export type Fc4pctn<H, P0> = [H, g.fneg<g.ffloor<g.fneg<P0>>>];
 
 /** math.archExp */
-export type Fpew091<H, P0> = g.panic<"unsupported: GOROOT/src/math/exp_asm.go:11:6: function without body: math.archExp">;
+export type Fpew091<H, P0> = g.panic<"unsupported: math/exp_asm.go:11:6: function without body: math.archExp">;
 
 /** math.archFloor */
 export type Fxd6hk4<H, P0> = [H, g.ffloor<P0>];
@@ -734471,12 +734471,12 @@ export type Fxd6hk4<H, P0> = [H, g.ffloor<P0>];
 
 
 /** math.archLog */
-export type Fhe6s05<H, P0> = g.panic<"unsupported: GOROOT/src/math/log_asm.go:11:6: function without body: math.archLog">;
+export type Fhe6s05<H, P0> = g.panic<"unsupported: math/log_asm.go:11:6: function without body: math.archLog">;
 
 
 
 /** math.archMin */
-export type Ffuz6f9<H, P0, P1> = g.panic<"unsupported: GOROOT/src/math/dim_asm.go:15:6: function without body: math.archMin">;
+export type Ffuz6f9<H, P0, P1> = g.panic<"unsupported: math/dim_asm.go:15:6: function without body: math.archMin">;
 
 
 
@@ -784967,16 +784967,16 @@ type Frpv8pd_3<H, t0, t1> =
   F6sgsbn<H4, t17, [813079381n, true]> : 0 : X4 : 0 : Frpv8pd_1<H3, t9, t0> : X3 : 0 : X2 : 0 : X1 : 0;
 
 /** runtime/pprof.readProfile */
-export type Fruhyzd<H> = g.panic<"unsupported: GOROOT/src/runtime/pprof/pprof.go:917:6: function without body: runtime/pprof.readProfile">;
+export type Fruhyzd<H> = g.panic<"unsupported: runtime/pprof/pprof.go:917:6: function without body: runtime/pprof.readProfile">;
 
 /** runtime/pprof.runtime_FrameStartLine */
-export type Ff0e5fv<H, P0> = g.panic<"unsupported: GOROOT/src/runtime/pprof/runtime.go:16:6: function without body: runtime/pprof.runtime_FrameStartLine">;
+export type Ff0e5fv<H, P0> = g.panic<"unsupported: runtime/pprof/runtime.go:16:6: function without body: runtime/pprof.runtime_FrameStartLine">;
 
 /** runtime/pprof.runtime_FrameSymbolName */
-export type F46vf66<H, P0> = g.panic<"unsupported: GOROOT/src/runtime/pprof/runtime.go:21:6: function without body: runtime/pprof.runtime_FrameSymbolName">;
+export type F46vf66<H, P0> = g.panic<"unsupported: runtime/pprof/runtime.go:21:6: function without body: runtime/pprof.runtime_FrameSymbolName">;
 
 /** runtime/pprof.runtime_expandFinalInlineFrame */
-export type Fv6alsr<H, P0> = g.panic<"unsupported: GOROOT/src/runtime/pprof/runtime.go:24:6: function without body: runtime/pprof.runtime_expandFinalInlineFrame">;
+export type Fv6alsr<H, P0> = g.panic<"unsupported: runtime/pprof/runtime.go:24:6: function without body: runtime/pprof.runtime_expandFinalInlineFrame">;
 
 /** runtime/pprof.unlockProfiles */
 export type F8sdzz1<H> =
