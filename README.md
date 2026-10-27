@@ -15,6 +15,10 @@ computes for them. Nothing here is anything but TypeScript.
   cells for the heap, maps, panics. It is the semantics: any TypeScript
   checker evaluates it the same way.
 
+- [`tstc/tstc.ts`](tstc/tstc.ts) is a compiler of type-level TypeScript to
+  LLVM IR, itself type-level TypeScript (about 650 lines). It compiles
+  itself: the compiler made from its own IR gives the same IR again.
+
 A program's entry is `Main<Input>`: give it the input (for `tsc.ts`, the
 project's files and arguments) and the type it evaluates to is the output.
 tsgo's test suites pass byte for byte this way, and on real projects
@@ -80,6 +84,23 @@ git clone https://github.com/zzj3720/go2types
 cd go2types && (cd tstc && sh scripts/ci.sh)
 tstc/tstc build ../tstst/programs/tsc.ts -o tsc --rt tstc/rt -O 1
 ```
+
+## tstc in types
+
+`tstc/tstc.ts` compiles type-level programs for the runtime of
+[go2types](https://github.com/zzj3720/go2types)' tstc (`libtstcrt.a`): an
+alias becomes a function of its frame, memoized by its arguments;
+conditional types, `infer` patterns (in tuples, templates and function
+types), tuples, unions, intersections, template literal types, object and
+mapped types, `keyof`, indexed access and the intrinsic string types are
+made by the runtime. It reads the program's text (`Main<Source>`) and gives
+the IR, which clang links with the runtime.
+
+Built once by the MoonBit tstc, it compiles the benchmark programs of
+go2types' `tstc/bench/tl` (Peano arithmetic, sorting, strings, a JSON
+parser, a stack machine, type challenges) to programs whose results are
+those of the MoonBit tstc, and it compiles itself to a fixed point
+(go2types' `tstc/scripts/typelevel.sh`).
 
 ## License
 
