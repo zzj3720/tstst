@@ -557,7 +557,7 @@ type GenMapped<X, P extends string, C extends Ctx> =
     ? WithScope<C, Bind<C, P>> extends infer C2 extends Ctx
       ? (K extends ["keyof", infer T] ? [T, T extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1] : [null, -1]) extends [infer Of, infer HS extends number]
         ? [`  %r${P} = call i64 @rt_mapped(ptr @"md.${C[0]}${P}", ptr %env)\n`, `%r${P}`,
-           `${Of extends null ? Fn<`${C[0]}$mc${P}`, K, `${P}.2`, C> : Fn<`${C[0]}$mo${P}`, Of, `${P}.2.0`, C>}${As extends null ? "" : Fn<`${C[0]}$ma${P}`, As, `${P}.3`, C2>}${Fn<`${C[0]}$mb${P}`, B, `${P}.4`, C2>}@"md.${C[0]}${P}" = internal constant { i64, i64, ptr, ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64 } { i64 ${C[5]}, i64 ${BinderSlot<C, P>}, ptr ${Of extends null ? `@"${C[0]}$mc${P}"` : `@"${C[0]}$mo${P}"`}, ptr ${HS extends -1 ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${Of extends null ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${As extends null ? "null" : `@"${C[0]}$ma${P}"`}, ptr @"${C[0]}$mb${P}", i64 0, i64 -1, i64 ${Ro}, i64 ${Opt}, i64 ${Of extends null ? 0 : 1}, i64 ${HS} }\n`]
+           `${Fn<`${C[0]}$mb${P}`, B, `${P}.4`, C2>}${Of extends null ? Fn<`${C[0]}$mc${P}`, K, `${P}.2`, C> : Fn<`${C[0]}$mo${P}`, Of, `${P}.2.0`, C>}${As extends null ? "" : Fn<`${C[0]}$ma${P}`, As, `${P}.3`, C2>}@"md.${C[0]}${P}" = internal constant { i64, i64, ptr, ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64 } { i64 ${C[5]}, i64 ${BinderSlot<C, P>}, ptr ${Of extends null ? `@"${C[0]}$mc${P}"` : `@"${C[0]}$mo${P}"`}, ptr ${HS extends -1 ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${Of extends null ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${As extends null ? "null" : `@"${C[0]}$ma${P}"`}, ptr @"${C[0]}$mb${P}", i64 0, i64 -1, i64 ${Ro}, i64 ${Opt}, i64 ${Of extends null ? 0 : 1}, i64 ${HS} }\n`]
         : never
       : never
     : never;
@@ -586,7 +586,7 @@ Le${P}:
 Lj${P}:
   %r${P} = phi i64 [ %vp${P}, %Lp${P} ], [ ${DV}, %Le${P} ]
 `, `%r${P}`,
-         `${KD}${DD}${Join<DispatchFns<Ps, P, C>>}${Join<DispatchNames<Ps, C, P>>}@"dn.${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<DispatchNameRefs<Ps, C, P>, ", ">}]
+         `${DD}${KD}${Join<DispatchFns<Ps, P, C>>}${Join<DispatchNames<Ps, C, P>>}@"dn.${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<DispatchNameRefs<Ps, C, P>, ", ">}]
 @"dt.${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<DispatchFnRefs<Ps, C, P>, ", ">}]
 @"dd.${C[0]}${P}" = internal global { i64, ptr, i64, ptr, i64, ptr, ptr } { i64 ${Ps["length"]}, ptr @"dn.${C[0]}${P}", i64 0, ptr null, i64 0, ptr null, ptr null }\n`]
       : never
@@ -625,6 +625,9 @@ type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends
 type GenCond<X, P extends string, C extends Ctx> =
   [`  %k${P} = call { i64, i64 } @"${C[0]}$c${P}"(ptr %env)\n  %r${P} = extractvalue { i64, i64 } %k${P}, 0\n`, `%r${P}`, CondFns<X, P, C>];
 
+// (definitions come first in what they are joined into, the deepest first:
+// text appended to a string that ends its buffer is appended in place, the
+// rest copied, so an else-chain's definitions are not copied at every level)
 type CondFns<X, P extends string, C extends Ctx> =
   X extends ["cond", infer A, infer E, infer T, infer F]
     ? Gen<A, `${P}.0`, C> extends [infer CA extends string, infer CV extends string, infer CD extends string]
@@ -635,7 +638,7 @@ type CondFns<X, P extends string, C extends Ctx> =
               [[infer ED extends string, infer EP extends string, infer EV extends string],
                [infer TD extends string, infer TP extends string, infer TV extends string],
                [infer FD extends string, infer FP extends string, infer FV extends string]]
-            ? `${CD}${ED}${Is extends [] ? "" : Pat<E, `${P}.1`, C>}${TD}${FD}@"${C[0]}$i${P}" = internal constant [${Plus<Is["length"], 1>} x i64] [${Join<[...{ [K in keyof Is]: `i64 ${BinderSlot<C, Is[K][0]>}` }, "i64 0"], ", ">}]
+            ? `${FD}${TD}${ED}${CD}${Is extends [] ? "" : Pat<E, `${P}.1`, C>}@"${C[0]}$i${P}" = internal constant [${Plus<Is["length"], 1>} x i64] [${Join<[...{ [K in keyof Is]: `i64 ${BinderSlot<C, Is[K][0]>}` }, "i64 0"], ", ">}]
 @"${C[0]}$d${P}" = internal constant { i64, i64, ptr, i64, ptr, ptr, i64, ptr, i64, ptr, i64, ptr } { i64 ${C[5]}, i64 ${A extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1}, ptr ${EP}, i64 ${EV}, ptr ${Is extends [] ? "null" : `@"p${C[0]}${P}.1"`}, ptr @"${C[0]}$i${P}", i64 ${Is["length"]}, ptr ${TP}, i64 ${TV}, ptr ${FP}, i64 ${FV}, ptr @"${C[0]}$c${P}" }
 define internal { i64, i64 } @"${C[0]}$c${P}"(ptr %env) {
 entry:
