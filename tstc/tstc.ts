@@ -351,8 +351,6 @@ type LastDigit<N extends string> =
   : N extends `${infer H}5` ? [H, 5] : N extends `${infer H}6` ? [H, 6] : N extends `${infer H}7` ? [H, 7] : N extends `${infer H}8` ? [H, 8] : N extends `${infer H}9` ? [H, 9] : never;
 type Range<N extends number, Acc extends number[] = []> = Acc["length"] extends N ? Acc : Range<N, [...Acc, Acc["length"]]>;
 type Plus<A extends number, B extends number> = [...Range<A>, ...Range<B>]["length"] & number;
-type IndexOf<X, L extends any[], I extends 0[] = []> =
-  L extends [infer H, ...infer R] ? ([H] extends [X] ? I["length"] : IndexOf<X, R, [...I, 0]>) : -1;
 // (text is built front to back, each step appending to what it was given: a
 // step returning text it then prefixes leaves every suffix in the memo table)
 type Join<L extends string[], Sep extends string = "", Acc extends string = ""> =
@@ -370,7 +368,7 @@ type LLChar = { "\u0000": "\\00"; "\u0001": "\\01"; "\u0002": "\\02"; "\u0003": 
 // Gen<node, path, ctx> is [instructions, register, definitions]; names of
 // registers and globals are made of the node's path.
 
-type Ctx = [string, [string, number][], any, [string, string][], number, number, any];
+type Ctx = [string, [string, number][], any, any, number, number, any, any];
 type G = [string, string, string];
 
 type Kw = { any: 0; unknown: 1; never: 2; string: 3; number: 4; bigint: 5; symbol: 6; object: 7;
@@ -412,15 +410,15 @@ type BindersList<Xs extends any[], P extends string, I extends 0[] = [], Acc ext
   Xs extends [infer A, ...infer R] ? BindersList<R, P, [...I, 0], [...Acc, ...Binders<A, `${P}.${I["length"]}`>]> : Acc;
 
 // the slot of the binder at path Q
-type BinderSlot<C extends Ctx, Q extends string> =
-  IndexOf<Q, PathsOf<C[3]>> extends infer I extends number ? (I extends -1 ? -1 : Plus<C[4], I>) : never;
-type PathsOf<L extends [string, string][]> = { [K in keyof L]: L[K][0] };
-// the binders declared in the subtree at P, in scope
-type Bind<C extends Ctx, P extends string, L extends [string, string][] = C[3]> =
-  L extends [[infer Q extends string, infer N extends string], ...infer R extends [string, string][]]
-    ? Q extends P | `${P}.${string}` ? [[N, BinderSlot<C, Q>], ...Bind<C, P, R>] : Bind<C, P, R>
-    : [];
-type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], ...S], C[2], C[3], C[4], C[5], C[6]];
+// (the alias's table of its binders' slots, by path: they follow its
+// parameters, in the order of Binders)
+type BinderSlot<C extends Ctx, Q extends string> = C[3][Q] & number;
+type SlotTable<Bs extends [string, string][], I extends 0[], Acc extends [string, number][] = []> =
+  Bs extends [[infer Q extends string, string], ...infer R extends [string, string][]]
+    ? SlotTable<R, [...I, 0], [...Acc, [Q, I["length"]]]> : TableOf<[...Acc, [string, -1]]>;
+// the binders Bs (of a subtree), in scope
+type Bind<C extends Ctx, Bs extends [string, string][]> = { [K in keyof Bs]: [Bs[K][1], BinderSlot<C, Bs[K][0]>] };
+type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], ...S], C[2], C[3], C[4], C[5], C[6], C[7]];
 
 type Gen<X, P extends string, C extends Ctx> =
   X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
@@ -554,7 +552,7 @@ type ObjIndexes<Ps extends any[], C extends Ctx, P extends string, I extends 0[]
 // modifiers (homomorphic when X is a type variable)
 type GenMapped<X, P extends string, C extends Ctx> =
   X extends ["mapped", string, infer K, infer As, infer B, infer Ro extends number, infer Opt extends number]
-    ? WithScope<C, Bind<C, P>> extends infer C2 extends Ctx
+    ? WithScope<C, Bind<C, Binders<X, P>>> extends infer C2 extends Ctx
       ? (K extends ["keyof", infer T] ? [T, T extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1] : [null, -1]) extends [infer Of, infer HS extends number]
         ? [`  %r${P} = call i64 @rt_mapped(ptr @"md.${C[0]}${P}", ptr %env)\n`, `%r${P}`,
            `${Fn<`${C[0]}$mb${P}`, B, `${P}.4`, C2>}${Of extends null ? Fn<`${C[0]}$mc${P}`, K, `${P}.2`, C> : Fn<`${C[0]}$mo${P}`, Of, `${P}.2.0`, C>}${As extends null ? "" : Fn<`${C[0]}$ma${P}`, As, `${P}.3`, C2>}@"md.${C[0]}${P}" = internal constant { i64, i64, ptr, ptr, ptr, ptr, ptr, i64, i64, i64, i64, i64, i64 } { i64 ${C[5]}, i64 ${BinderSlot<C, P>}, ptr ${Of extends null ? `@"${C[0]}$mc${P}"` : `@"${C[0]}$mo${P}"`}, ptr ${HS extends -1 ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${Of extends null ? "null" : `@"${C[0]}$mo${P}"`}, ptr ${As extends null ? "null" : `@"${C[0]}$ma${P}"`}, ptr @"${C[0]}$mb${P}", i64 0, i64 -1, i64 ${Ro}, i64 ${Opt}, i64 ${Of extends null ? 0 : 1}, i64 ${HS} }\n`]
@@ -605,7 +603,7 @@ type GenCall<N0 extends string, As extends any[], P extends string, C extends Ct
 type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
   [FindDecl<C[2], N>] extends [infer D extends Decl]
     ? GenList<As, P, C> extends [infer A extends string, infer Vs extends string[], infer Ds extends string]
-      ? [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${Frame<D>}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
+      ? [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${C[7][D[0]] & number}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
          `%r${P}`, Ds]
       : never
     : ["", "18", ""];
@@ -632,7 +630,7 @@ type CondFns<X, P extends string, C extends Ctx> =
   X extends ["cond", infer A, infer E, infer T, infer F]
     ? Gen<A, `${P}.0`, C> extends [infer CA extends string, infer CV extends string, infer CD extends string]
       ? Binders<E, `${P}.1`> extends infer Is extends [string, string][]
-        ? WithScope<C, Bind<C, `${P}.1`>> extends infer CI extends Ctx
+        ? WithScope<C, Bind<C, Is>> extends infer CI extends Ctx
           ? [Is extends [] ? Thunked<`${C[0]}$e${P}`, E, `${P}.1`, CI> : [Fn<`${C[0]}$e${P}`, E, `${P}.1`, CI>, `@"${C[0]}$e${P}"`, "0"],
              Thunked<`${C[0]}$t${P}`, T, `${P}.2`, CI>, Thunked<`${C[0]}$f${P}`, F, `${P}.3`, C>] extends
               [[infer ED extends string, infer EP extends string, infer EV extends string],
@@ -713,13 +711,15 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 
 // (the names of an alias's own functions and constants start with its
 // index: the paths of their nodes follow, each starting with a dot)
-type CtxOf<D extends Decl, Ds, Names, Id extends string> =
-  [Id, Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : NoNames];
+type CtxOf<D extends Decl, Ds, Names, Id extends string, FT> =
+  [Id, Params<D[1]>, Ds, SlotTable<Binders<D[2], ".b">, { [K in keyof D[1]]: 0 }>, D[1]["length"], FT[D[0] & keyof FT] & number, D[3] extends keyof Names ? Names[D[3]] : NoNames, FT];
+// each alias's frame, by name (a call site reads its callee's)
+type FrameTable<Ds extends Decl[]> = TableOf<[...{ [K in keyof Ds]: [Ds[K][0], Frame<Ds[K]>] }, [string, 0]]>;
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
-type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
-  CtxOf<D, Ds, Names, Id> extends infer C extends Ctx
+type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff, FT> =
+  CtxOf<D, Ds, Names, Id, FT> extends infer C extends Ctx
     ? IsNative<D> extends true
       ? `${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
       : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
@@ -970,7 +970,7 @@ define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
 }
 
-${DeclMap<Ds> extends infer M ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff> }> : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Inc<Len<Ds[K][0]>>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
+${DeclMap<Ds> extends infer M ? FrameTable<Ds> extends infer FT ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff, FT> }> : never : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Inc<Len<Ds[K][0]>>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
 @tstc_entries = constant ptr @"tstc$entries"
 @tstc_nentries = constant i64 ${Ds["length"]}
 ${DumpList<Ds, MainFile> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
