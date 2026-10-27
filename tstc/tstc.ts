@@ -751,19 +751,30 @@ entry:
 // of "calls one of them", from the natives.
 type EffectNatives = "hget" | "hset" | "hgetf" | "hsetf" | "hgets" | "hsets" | "halloc" | "hinit" | "hcopy" | "hloadt" | "hstoret" | "salloc" | "sappend" | "sappendv" | "scopy" | "sclear" | "sswap" | "bytes2s" | "ptrstr" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "bstr" | "bappend" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "clock_ms" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step";
 // (the effect set is a union: a big union finds a member by its hash)
-type EffectSet<Ds extends Decl[], Names extends FileTables> = EffReach<Callers<Ds, Names>, EffSeeds<Ds>, never>;
+type EffectSet<Ds extends Decl[], Names extends FileTables> = Reach<Callers<Ds, Names>, EffSeeds<Ds>, never>;
 type EffSeeds<Ds extends Decl[]> = { [I in keyof Ds]: IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never }[number];
 // who calls each alias: one pair per declaration, its callees to its name
 // (the pairs of a name merge into the union of its callers)
 type Callers<Ds extends Decl[], Names extends FileTables> = TableOf<[...{ [I in keyof Ds]: [Callees<Ds[I], Names>, Ds[I][0]] }, [string, never]]>;
 // from the natives up through the callers, each step the callers of the
 // last step's new aliases not yet seen: each edge followed once
-type EffReach<C extends NoNames, F, Seen> = [F] extends [never] ? Seen : EffReach<C, NotIn<C[F & string], Seen | F>, Seen | F>;
+type Reach<C extends NoNames, F, Seen> = [F] extends [never] ? Seen : Reach<C, NotIn<C[F & string], Seen | F>, Seen | F>;
 type NotIn<X, S> = X extends S ? never : X;
 // the aliases a declaration's body names, as its file resolves them
 // (the file's table as it is: an intersection with another object would
 // make every lookup merge the members of both)
-type Callees<D, Names extends FileTables> = D extends Decl ? Resolve<RefNames<D[2]>, D[3] extends keyof Names ? Names[D[3]] : NoNames> : never;
+type Callees<D, Names extends FileTables> = D extends Decl ? Resolve<RefNames<D[2]> | RefNames<D[1]>, D[3] extends keyof Names ? Names[D[3]] : NoNames> : never;
+// what a declaration needs compiled: its callees and its @catch handler
+type Uses<D, Names extends FileTables> =
+  D extends Decl ? Callees<D, Names> | (D[5] extends "" ? never : Resolve<D[5], D[3] extends keyof Names ? Names[D[3]] : NoNames>) : never;
+// the declarations compiled: those of the program's own file and what they
+// use, in their order (a program's lib is mostly what it does not call)
+type Reachable<Ds extends Decl[], Names extends FileTables, F extends string> =
+  Reach<TableOf<[...{ [I in keyof Ds]: [Ds[I][0], Uses<Ds[I], Names>] }, [string, never]]>,
+    { [I in keyof Ds]: Ds[I][3] extends F ? Ds[I][0] : never }[number], never> extends infer R
+    ? KeepDecls<Ds, R> : never;
+type KeepDecls<Ds, R, Acc extends Decl[] = []> =
+  Ds extends [infer D extends Decl, ...infer Rest] ? KeepDecls<Rest, R, D[0] extends R ? [...Acc, D] : Acc> : Acc;
 type FileTables = { [f: string]: any };
 type Resolve<N, M extends NoNames> = N extends string ? Lookup<M, N> : never;
 type RefNames<X> = X extends ["ref", infer N, infer As] ? N | RefNames<As> : X extends [infer H, ...infer R] ? RefNames<H> | RefNames<R> : never;
@@ -1057,5 +1068,5 @@ type AllDecls<Files, Acc extends Decl[] = []> = Files extends [[string, infer Ds
 
 type Main<Pack extends string = ""> =
   ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
-    ? Module<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>>
+    ? Module<Reachable<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0]>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>>
     : never;
