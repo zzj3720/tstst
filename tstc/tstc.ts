@@ -718,7 +718,7 @@ type Params<Ps extends [string, any][], I extends 0[] = []> =
 type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
   CtxOf<D, Ds, Names, Id> extends infer C extends Ctx
     ? IsNative<D> extends true
-      ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
+      ? `${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
       : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
       : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Caught<D, C>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
@@ -763,7 +763,7 @@ type NotIn<X, S> = X extends S ? never : X;
 // the aliases a declaration's body names, as its file resolves them
 // (the file's table as it is: an intersection with another object would
 // make every lookup merge the members of both)
-type Callees<D, Names extends FileTables> = D extends Decl ? Resolve<RefNames<D[2]> | RefNames<D[1]>, D[3] extends keyof Names ? Names[D[3]] : NoNames> : never;
+type Callees<D, Names extends FileTables> = D extends Decl ? Resolve<(IsNative<D> extends true ? never : RefNames<D[2]>) | RefNames<D[1]>, D[3] extends keyof Names ? Names[D[3]] : NoNames> : never;
 // what a declaration needs compiled: its callees and its @catch handler
 type Uses<D, Names extends FileTables> =
   D extends Decl ? Callees<D, Names> | (D[5] extends "" ? never : Resolve<D[5], D[3] extends keyof Names ? Names[D[3]] : NoNames>) : never;
@@ -785,11 +785,39 @@ type RefNames<X> = X extends ["ref", infer N, infer As] ? N | RefNames<As> : X e
 // the natives were checked against (their FNV-1a hashes, as the MoonBit tstc
 // checks them); otherwise its definition.
 
-type LibHashes = {
-  "float.ts": "5712411105102384201"; "go.ts": "5160468277790861014"; "gort.ts": "2680261447692585256";
-  "heap.ts": "940415589675261843"; "int.ts": "-6424677977165027"; "map.ts": "-653147424055246936";
-  "misc.ts": "-17566272838564479"; "rterr.ts": "5335410618643360334"; "softfloat.ts": "-2618646305736984855";
-  "str.ts": "541375017417051346"; "tables.ts": "-1180400605690907689" };
+// (their FNV-1a 64 hashes as hex digits, least significant first)
+type LibHashes = { "float.ts": "94ccf9a62af864f4"; "go.ts": "6d6656cae8aad974"; "gort.ts": "82904e6069332352"; "heap.ts": "39f55db0ff60d0d0"; "int.ts": "d13ff571acc29eff"; "map.ts": "8afb93bd0ed8fe6f"; "misc.ts": "1850e63619791cff"; "rterr.ts": "e4aa51f70bf2b0a4"; "softfloat.ts": "9e678222f03b8abd"; "str.ts": "2dc0a63c5b953870"; "tables.ts": "7d3332537ef5e9fe" };
+
+// ---------------------------------------------------------------------------
+// FNV-1a 64 of the lib's files, at compile time (as the MoonBit tstc decides
+// which natives replace definitions): the hash as 16 hex digits, least
+// significant first; a byte is xored in, then the product by the prime
+// 2^40 + 0x1b3 is formed column by column (3h + 11h<<4 + h<<8 + h<<40)
+type FnvText<S extends string, H extends number[] = [5, 2, 3, 2, 2, 2, 4, 8, 4, 14, 12, 9, 2, 15, 11, 12]> =
+  S extends `${infer C}${infer R}` ? FnvText<R, FnvMul<FnvXor<H, C extends keyof ByteHex ? ByteHex[C] : [3, 15]>>> : H;
+type FnvXor<H extends number[], B extends [number, number]> =
+  H extends [infer D0 extends number, infer D1 extends number, ...infer Rest] ? [XorT[D0][B[1]], XorT[D1][B[0]], ...Rest] : never;
+// (column I of the product: H[I] * 3, H[I - 1] * 11, H[I - 2], H[I - 10],
+// the carry; Hp is H after ten zeros)
+type FnvMul<H extends number[]> = FnvCol<[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...H], 0, []>;
+type FnvCol<Hp extends number[], Cy extends number, Acc extends number[]> =
+  Acc["length"] extends 16 ? Acc
+  : FnvIdx[Acc["length"]] extends [infer I0 extends number, infer I1 extends number, infer I2 extends number, infer I10 extends number]
+    ? MulT[Hp[I0]][Hp[I1]] extends [infer ML extends number, infer MH extends number]
+      ? AddT[Hp[I2]][Hp[I10]] extends [infer AL extends number, infer AH extends number]
+        ? AddT[AL][Cy] extends [infer BL extends number, infer BH extends number]
+          ? AddT[ML][BL] extends [infer R extends number, infer CH extends number]
+            ? FnvCol<Hp, AddT[AddT[AddT[MH][AH][0]][BH][0]][CH][0], [...Acc, R]>
+            : never : never : never : never
+    : never;
+type FnvIdx = [[10, 9, 8, 0], [11, 10, 9, 1], [12, 11, 10, 2], [13, 12, 11, 3], [14, 13, 12, 4], [15, 14, 13, 5], [16, 15, 14, 6], [17, 16, 15, 7], [18, 17, 16, 8], [19, 18, 17, 9], [20, 19, 18, 10], [21, 20, 19, 11], [22, 21, 20, 12], [23, 22, 21, 13], [24, 23, 22, 14], [25, 24, 23, 15]];
+type FnvHex<H extends number[]> = Join<{ [K in keyof H]: HexChr[H[K]] }>;
+type HexChr = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"];
+type XorT = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], [1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14], [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13], [3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12], [4, 5, 6, 7, 0, 1, 2, 3, 12, 13, 14, 15, 8, 9, 10, 11], [5, 4, 7, 6, 1, 0, 3, 2, 13, 12, 15, 14, 9, 8, 11, 10], [6, 7, 4, 5, 2, 3, 0, 1, 14, 15, 12, 13, 10, 11, 8, 9], [7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8], [8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7], [9, 8, 11, 10, 13, 12, 15, 14, 1, 0, 3, 2, 5, 4, 7, 6], [10, 11, 8, 9, 14, 15, 12, 13, 2, 3, 0, 1, 6, 7, 4, 5], [11, 10, 9, 8, 15, 14, 13, 12, 3, 2, 1, 0, 7, 6, 5, 4], [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3], [13, 12, 15, 14, 9, 8, 11, 10, 5, 4, 7, 6, 1, 0, 3, 2], [14, 15, 12, 13, 10, 11, 8, 9, 6, 7, 4, 5, 2, 3, 0, 1], [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]];
+type AddT = [[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0]], [[1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1]], [[2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1]], [[3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1]], [[4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1]], [[5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1]], [[6, 0], [7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1]], [[7, 0], [8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1]], [[8, 0], [9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1]], [[9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1]], [[10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1]], [[11, 0], [12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1]], [[12, 0], [13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1]], [[13, 0], [14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1]], [[14, 0], [15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1], [13, 1]], [[15, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1], [13, 1], [14, 1]]];
+type MulT = [[[0, 0], [11, 0], [6, 1], [1, 2], [12, 2], [7, 3], [2, 4], [13, 4], [8, 5], [3, 6], [14, 6], [9, 7], [4, 8], [15, 8], [10, 9], [5, 10]], [[3, 0], [14, 0], [9, 1], [4, 2], [15, 2], [10, 3], [5, 4], [0, 5], [11, 5], [6, 6], [1, 7], [12, 7], [7, 8], [2, 9], [13, 9], [8, 10]], [[6, 0], [1, 1], [12, 1], [7, 2], [2, 3], [13, 3], [8, 4], [3, 5], [14, 5], [9, 6], [4, 7], [15, 7], [10, 8], [5, 9], [0, 10], [11, 10]], [[9, 0], [4, 1], [15, 1], [10, 2], [5, 3], [0, 4], [11, 4], [6, 5], [1, 6], [12, 6], [7, 7], [2, 8], [13, 8], [8, 9], [3, 10], [14, 10]], [[12, 0], [7, 1], [2, 2], [13, 2], [8, 3], [3, 4], [14, 4], [9, 5], [4, 6], [15, 6], [10, 7], [5, 8], [0, 9], [11, 9], [6, 10], [1, 11]], [[15, 0], [10, 1], [5, 2], [0, 3], [11, 3], [6, 4], [1, 5], [12, 5], [7, 6], [2, 7], [13, 7], [8, 8], [3, 9], [14, 9], [9, 10], [4, 11]], [[2, 1], [13, 1], [8, 2], [3, 3], [14, 3], [9, 4], [4, 5], [15, 5], [10, 6], [5, 7], [0, 8], [11, 8], [6, 9], [1, 10], [12, 10], [7, 11]], [[5, 1], [0, 2], [11, 2], [6, 3], [1, 4], [12, 4], [7, 5], [2, 6], [13, 6], [8, 7], [3, 8], [14, 8], [9, 9], [4, 10], [15, 10], [10, 11]], [[8, 1], [3, 2], [14, 2], [9, 3], [4, 4], [15, 4], [10, 5], [5, 6], [0, 7], [11, 7], [6, 8], [1, 9], [12, 9], [7, 10], [2, 11], [13, 11]], [[11, 1], [6, 2], [1, 3], [12, 3], [7, 4], [2, 5], [13, 5], [8, 6], [3, 7], [14, 7], [9, 8], [4, 9], [15, 9], [10, 10], [5, 11], [0, 12]], [[14, 1], [9, 2], [4, 3], [15, 3], [10, 4], [5, 5], [0, 6], [11, 6], [6, 7], [1, 8], [12, 8], [7, 9], [2, 10], [13, 10], [8, 11], [3, 12]], [[1, 2], [12, 2], [7, 3], [2, 4], [13, 4], [8, 5], [3, 6], [14, 6], [9, 7], [4, 8], [15, 8], [10, 9], [5, 10], [0, 11], [11, 11], [6, 12]], [[4, 2], [15, 2], [10, 3], [5, 4], [0, 5], [11, 5], [6, 6], [1, 7], [12, 7], [7, 8], [2, 9], [13, 9], [8, 10], [3, 11], [14, 11], [9, 12]], [[7, 2], [2, 3], [13, 3], [8, 4], [3, 5], [14, 5], [9, 6], [4, 7], [15, 7], [10, 8], [5, 9], [0, 10], [11, 10], [6, 11], [1, 12], [12, 12]], [[10, 2], [5, 3], [0, 4], [11, 4], [6, 5], [1, 6], [12, 6], [7, 7], [2, 8], [13, 8], [8, 9], [3, 10], [14, 10], [9, 11], [4, 12], [15, 12]], [[13, 2], [8, 3], [3, 4], [14, 4], [9, 5], [4, 6], [15, 6], [10, 7], [5, 8], [0, 9], [11, 9], [6, 10], [1, 11], [12, 11], [7, 12], [2, 13]]];
+type ByteHex = { "\u0000": [0, 0]; "\u0001": [0, 1]; "\u0002": [0, 2]; "\u0003": [0, 3]; "\u0004": [0, 4]; "\u0005": [0, 5]; "\u0006": [0, 6]; "\u0007": [0, 7]; "\u0008": [0, 8]; "\u0009": [0, 9]; "\u000a": [0, 10]; "\u000b": [0, 11]; "\u000c": [0, 12]; "\u000d": [0, 13]; "\u000e": [0, 14]; "\u000f": [0, 15]; "\u0010": [1, 0]; "\u0011": [1, 1]; "\u0012": [1, 2]; "\u0013": [1, 3]; "\u0014": [1, 4]; "\u0015": [1, 5]; "\u0016": [1, 6]; "\u0017": [1, 7]; "\u0018": [1, 8]; "\u0019": [1, 9]; "\u001a": [1, 10]; "\u001b": [1, 11]; "\u001c": [1, 12]; "\u001d": [1, 13]; "\u001e": [1, 14]; "\u001f": [1, 15]; " ": [2, 0]; "!": [2, 1]; "\"": [2, 2]; "#": [2, 3]; "$": [2, 4]; "%": [2, 5]; "&": [2, 6]; "'": [2, 7]; "(": [2, 8]; ")": [2, 9]; "*": [2, 10]; "+": [2, 11]; ",": [2, 12]; "-": [2, 13]; ".": [2, 14]; "/": [2, 15]; "0": [3, 0]; "1": [3, 1]; "2": [3, 2]; "3": [3, 3]; "4": [3, 4]; "5": [3, 5]; "6": [3, 6]; "7": [3, 7]; "8": [3, 8]; "9": [3, 9]; ":": [3, 10]; ";": [3, 11]; "<": [3, 12]; "=": [3, 13]; ">": [3, 14]; "?": [3, 15]; "@": [4, 0]; "A": [4, 1]; "B": [4, 2]; "C": [4, 3]; "D": [4, 4]; "E": [4, 5]; "F": [4, 6]; "G": [4, 7]; "H": [4, 8]; "I": [4, 9]; "J": [4, 10]; "K": [4, 11]; "L": [4, 12]; "M": [4, 13]; "N": [4, 14]; "O": [4, 15]; "P": [5, 0]; "Q": [5, 1]; "R": [5, 2]; "S": [5, 3]; "T": [5, 4]; "U": [5, 5]; "V": [5, 6]; "W": [5, 7]; "X": [5, 8]; "Y": [5, 9]; "Z": [5, 10]; "[": [5, 11]; "\\": [5, 12]; "]": [5, 13]; "^": [5, 14]; "_": [5, 15]; "`": [6, 0]; "a": [6, 1]; "b": [6, 2]; "c": [6, 3]; "d": [6, 4]; "e": [6, 5]; "f": [6, 6]; "g": [6, 7]; "h": [6, 8]; "i": [6, 9]; "j": [6, 10]; "k": [6, 11]; "l": [6, 12]; "m": [6, 13]; "n": [6, 14]; "o": [6, 15]; "p": [7, 0]; "q": [7, 1]; "r": [7, 2]; "s": [7, 3]; "t": [7, 4]; "u": [7, 5]; "v": [7, 6]; "w": [7, 7]; "x": [7, 8]; "y": [7, 9]; "z": [7, 10]; "{": [7, 11]; "|": [7, 12]; "}": [7, 13]; "~": [7, 14]; "\u007f": [7, 15]; "\u0080": [8, 0]; "\u0081": [8, 1]; "\u0082": [8, 2]; "\u0083": [8, 3]; "\u0084": [8, 4]; "\u0085": [8, 5]; "\u0086": [8, 6]; "\u0087": [8, 7]; "\u0088": [8, 8]; "\u0089": [8, 9]; "\u008a": [8, 10]; "\u008b": [8, 11]; "\u008c": [8, 12]; "\u008d": [8, 13]; "\u008e": [8, 14]; "\u008f": [8, 15]; "\u0090": [9, 0]; "\u0091": [9, 1]; "\u0092": [9, 2]; "\u0093": [9, 3]; "\u0094": [9, 4]; "\u0095": [9, 5]; "\u0096": [9, 6]; "\u0097": [9, 7]; "\u0098": [9, 8]; "\u0099": [9, 9]; "\u009a": [9, 10]; "\u009b": [9, 11]; "\u009c": [9, 12]; "\u009d": [9, 13]; "\u009e": [9, 14]; "\u009f": [9, 15]; "\u00a0": [10, 0]; "\u00a1": [10, 1]; "\u00a2": [10, 2]; "\u00a3": [10, 3]; "\u00a4": [10, 4]; "\u00a5": [10, 5]; "\u00a6": [10, 6]; "\u00a7": [10, 7]; "\u00a8": [10, 8]; "\u00a9": [10, 9]; "\u00aa": [10, 10]; "\u00ab": [10, 11]; "\u00ac": [10, 12]; "\u00ad": [10, 13]; "\u00ae": [10, 14]; "\u00af": [10, 15]; "\u00b0": [11, 0]; "\u00b1": [11, 1]; "\u00b2": [11, 2]; "\u00b3": [11, 3]; "\u00b4": [11, 4]; "\u00b5": [11, 5]; "\u00b6": [11, 6]; "\u00b7": [11, 7]; "\u00b8": [11, 8]; "\u00b9": [11, 9]; "\u00ba": [11, 10]; "\u00bb": [11, 11]; "\u00bc": [11, 12]; "\u00bd": [11, 13]; "\u00be": [11, 14]; "\u00bf": [11, 15]; "\u00c0": [12, 0]; "\u00c1": [12, 1]; "\u00c2": [12, 2]; "\u00c3": [12, 3]; "\u00c4": [12, 4]; "\u00c5": [12, 5]; "\u00c6": [12, 6]; "\u00c7": [12, 7]; "\u00c8": [12, 8]; "\u00c9": [12, 9]; "\u00ca": [12, 10]; "\u00cb": [12, 11]; "\u00cc": [12, 12]; "\u00cd": [12, 13]; "\u00ce": [12, 14]; "\u00cf": [12, 15]; "\u00d0": [13, 0]; "\u00d1": [13, 1]; "\u00d2": [13, 2]; "\u00d3": [13, 3]; "\u00d4": [13, 4]; "\u00d5": [13, 5]; "\u00d6": [13, 6]; "\u00d7": [13, 7]; "\u00d8": [13, 8]; "\u00d9": [13, 9]; "\u00da": [13, 10]; "\u00db": [13, 11]; "\u00dc": [13, 12]; "\u00dd": [13, 13]; "\u00de": [13, 14]; "\u00df": [13, 15]; "\u00e0": [14, 0]; "\u00e1": [14, 1]; "\u00e2": [14, 2]; "\u00e3": [14, 3]; "\u00e4": [14, 4]; "\u00e5": [14, 5]; "\u00e6": [14, 6]; "\u00e7": [14, 7]; "\u00e8": [14, 8]; "\u00e9": [14, 9]; "\u00ea": [14, 10]; "\u00eb": [14, 11]; "\u00ec": [14, 12]; "\u00ed": [14, 13]; "\u00ee": [14, 14]; "\u00ef": [14, 15]; "\u00f0": [15, 0]; "\u00f1": [15, 1]; "\u00f2": [15, 2]; "\u00f3": [15, 3]; "\u00f4": [15, 4]; "\u00f5": [15, 5]; "\u00f6": [15, 6]; "\u00f7": [15, 7]; "\u00f8": [15, 8]; "\u00f9": [15, 9]; "\u00fa": [15, 10]; "\u00fb": [15, 11]; "\u00fc": [15, 12]; "\u00fd": [15, 13]; "\u00fe": [15, 14]; "\u00ff": [15, 15] };
+
 // what the runtime implements (the MoonBit tstc's lib_native_names: a tag
 // naming anything else, e.g. the goroutine scheduling its compiler handles
 // itself, keeps the definition)
@@ -802,9 +830,6 @@ type NativeBody<D extends Decl> =
   `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<ArgTypes<D[1]>, ", ">})
 define internal { i64, i64 } @"${D[0]}$body"(ptr %env) {
 entry:
-  %ok = call i1 @tstc0.libok()
-  br i1 %ok, label %N, label %D
-N:
 ${Join<ArgLoads<D[1]>>}${D[4] extends PairNatives
   ? `  %p = call { i64, i64 } @n_${D[4]}(${Join<ArgRefs<D[1]>, ", ">})
   %p0 = extractvalue { i64, i64 } %p, 0
@@ -813,46 +838,17 @@ ${Join<ArgLoads<D[1]>>}${D[4] extends PairNatives
   : `  %v = call i64 @n_${D[4]}(${Join<ArgRefs<D[1]>, ", ">})`}
   %r = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 %v, 0
   ret { i64, i64 } %r
-D:
-  %d = musttail call { i64, i64 } @"${D[0]}$def"(ptr %env)
-  ret { i64, i64 } %d
 }
 `;
 // (mapped over a parameter: tuples map to tuples)
 type ArgTypes<Ps extends any[]> = { [K in keyof Ps]: "i64" };
 type ArgLoads<Ps extends any[]> = { [K in keyof Ps]: `  %g${K & string} = getelementptr inbounds i64, ptr %env, i64 ${K & string}\n  %a${K & string} = load i64, ptr %g${K & string}\n` };
 type ArgRefs<Ps extends any[]> = { [K in keyof Ps]: `i64 %a${K & string}` };
-// whether the lib's files in the program are the checked versions: their
-// texts (bytes) hashed once, at the first native call
-type LibCheck<Srcs extends [string, string][]> =
-  LibSrcs<Srcs> extends infer L extends [string, string][] ? `${Join<{ [K in keyof L]: `@"src.${K & string}" = private constant [${Len<L[K][1]>} x i8] c"${U8<L[K][1]>}"\n` }>}@tstc0.libst = internal global i8 0
-define internal i1 @tstc0.libok() {
-entry:
-  %st = load i8, ptr @tstc0.libst
-  %known = icmp ne i8 %st, 0
-  br i1 %known, label %K, label %C
-K:
-  %okk = icmp eq i8 %st, 1
-  ret i1 %okk
-C:
-${Join<{ [K in keyof L]: `  %h${K & string} = call i64 @tstc0.fnv(ptr @"src.${K & string}", i64 ${Len<L[K][1]>})\n  %e${K & string} = icmp eq i64 %h${K & string}, ${BaseName<L[K][0]> extends keyof LibHashes ? LibHashes[BaseName<L[K][0]>] : "0"}\n` }>}${AndChain<{ [K in keyof L]: `%e${K & string}` }>}
-  %stv = select i1 %all, i8 1, i8 2
-  store i8 %stv, ptr @tstc0.libst
-  ret i1 %all
-}
-` : never;
-type AndChain<Es extends string[], I extends 0[] = [], Prev extends string = "1"> =
-  Es extends [infer E extends string, ...infer R extends string[]]
-    ? `  %and${I["length"]} = and i1 ${Prev}, ${E}\n${AndChain<R, [...I, 0], `%and${I["length"]}`>}`
-    : `  %all = and i1 ${Prev}, 1\n`;
 type LibSrcs<Srcs extends [string, string][]> =
   { [K in keyof Srcs]: Srcs[K] } extends infer A extends [string, string][] ? FilterLib<A> : never;
 type FilterLib<A extends [string, string][], Acc extends [string, string][] = []> =
   A extends [infer H extends [string, string], ...infer R extends [string, string][]]
     ? FilterLib<R, BaseName<H[0]> extends keyof LibHashes ? [...Acc, H] : Acc> : Acc;
-// a file's bytes (its code units below 256) in an LLVM string constant
-type U8<S extends string, Acc extends string = ""> =
-  S extends `${infer C}${infer R}` ? U8<R, `${Acc}${C extends keyof LLChar ? LLChar[C] : "?"}`> : Acc;
 // an alias looks its arguments up in the runtime's memo table (evaluation
 // is pure), then evaluates its body
 type Memo<D extends Decl, Id extends string> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
@@ -943,26 +939,6 @@ T:
   %t2 = call i64 @rt_tuple2(i64 %a, i64 %b)
   ret i64 %t2
 }
-define internal i64 @tstc0.fnv(ptr %p, i64 %n) {
-entry:
-  br label %L
-L:
-  %i = phi i64 [ 0, %entry ], [ %i2, %B ]
-  %h = phi i64 [ -3750763034362895579, %entry ], [ %h2, %B ]
-  %c = icmp ult i64 %i, %n
-  br i1 %c, label %B, label %E
-B:
-  %q = getelementptr inbounds i8, ptr %p, i64 %i
-  %b = load i8, ptr %q
-  %bz = zext i8 %b to i64
-  %x = xor i64 %h, %bz
-  %h2 = mul i64 %x, 1099511628211
-  %i2 = add i64 %i, 1
-  br label %L
-E:
-  ret i64 %h
-}
-${LibCheck<Srcs>}
 @tstc_top = external global ptr
 declare i64 @mk_num(double)
 declare i64 @mk_bigint_text(ptr)
@@ -1064,9 +1040,18 @@ type NsPairs<In, P extends string, Is extends any[], Acc extends any[] = []> =
     : Acc;
 type Prefixed<Ps extends any[], NS extends string> = { [K in keyof Ps]: [`${NS}.${Ps[K][0] & string}`, Ps[K][1]] };
 type NamesOf<Files> = InfoOf<Files> extends infer In ? { [P in keyof In]: FileNames<In, P & string> } : never;
+// the lib's natives replace its definitions only while all its files in the
+// program are the versions they were checked against; otherwise every
+// definition is compiled as written
+type LibOk<L extends [string, string][]> =
+  L extends [infer H extends [string, string], ...infer R extends [string, string][]]
+    ? (FnvHex<FnvText<H[1]>> extends LibHashes[BaseName<H[0]> & keyof LibHashes] ? LibOk<R> : false) : true;
+type NoNatives<Ds extends Decl[]> = { [K in keyof Ds]: [Ds[K][0], Ds[K][1], Ds[K][2], Ds[K][3], "", Ds[K][5]] };
 type AllDecls<Files, Acc extends Decl[] = []> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? AllDecls<R, [...Acc, ...Ds]> : Acc;
 
 type Main<Pack extends string = ""> =
   ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
-    ? Module<Reachable<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0]>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>>
+    ? (LibOk<LibSrcs<Unpack<Pack>>> extends true ? AllDecls<Files> : NoNatives<AllDecls<Files>>) extends infer Ds extends Decl[]
+      ? Module<Reachable<Ds, NamesOf<Files>, Unpack<Pack>[0][0]>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>>
+      : never
     : never;
