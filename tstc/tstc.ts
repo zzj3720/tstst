@@ -555,7 +555,7 @@ type DispatchFnRefs<Ps extends any[], C extends Ctx, P extends string> = { [K in
 // a call of the alias N: a frame at the top of the environment stack with its
 // arguments (and the defaults of those not given), then its function
 type GenCall<N0 extends string, As extends any[], P extends string, C extends Ctx> =
-  (N0 extends keyof C[6] ? C[6][N0] & string : N0) extends infer N extends string
+  (Lookup<C[6], N0> & string) extends infer N extends string
     ? [N] extends [never] ? ["", "18", ""] : GenCallG<N, As, P, C>
     : never;
 type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
@@ -650,7 +650,7 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 // runtime's command line (arguments given, then the defaults)
 
 type CtxOf<D extends Decl, Ds, Names> =
-  [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : {}];
+  [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : NoNames];
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
@@ -689,14 +689,20 @@ entry:
 // happen again (as the MoonBit tstc plans its memo). The least fixed point
 // of "calls one of them", from the natives.
 type EffectNatives = "hget" | "hset" | "hgetf" | "hsetf" | "hgets" | "hsets" | "halloc" | "hinit" | "hcopy" | "hloadt" | "hstoret" | "salloc" | "sappend" | "sappendv" | "scopy" | "sclear" | "sswap" | "bytes2s" | "ptrstr" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "bstr" | "bappend" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "clock_ms" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step";
-type EffectSet<Ds extends Decl[], Names> = EffectStep<Ds, Names, EffSeed<Ds>>;
+type EffectSet<Ds extends Decl[], Names> = EffectStep<Ds, Names, Flat<EffSeed<Ds> & NoEff>>;
+// (an effect set reads 1 for its names and 0 | 1 for the others: a test is
+// one property access)
+type NoEff = { [k: string]: 0 | 1 };
 type EffSeed<Ds extends Decl[]> = { [I in keyof Ds as I extends `${number}` ? (IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never) : never]: 1 };
 type EffectStep<Ds extends Decl[], Names, E> =
-  EffNext<Ds, Names, E> extends infer E2 ? (keyof E2 extends keyof E ? E : EffectStep<Ds, Names, E2>) : never;
-type EffNext<Ds extends Decl[], Names, E> = Flat<E & { [I in keyof Ds as I extends `${number}` ? ([Callees<Ds[I], Names> & keyof E] extends [never] ? never : Ds[I][0]) : never]: 1 }>;
+  EffNew<Ds, Names, E> extends infer N ? ([keyof N] extends [never] ? E : EffectStep<Ds, Names, Flat<E & N>>) : never;
+// the aliases not in E that call one in it
+type EffNew<Ds extends Decl[], Names, E> = { [I in keyof Ds as I extends `${number}` ? (
+    E[Ds[I][0] & keyof E] extends 1 ? never : true extends HasEff<Callees<Ds[I], Names>, E> ? Ds[I][0] : never) : never]: 1 };
+type HasEff<Cs, E> = Cs extends string ? (E[Cs & keyof E] extends 1 ? true : false) : false;
 // the aliases a declaration's body names, as its file resolves them
 type Callees<D, Names> = D extends Decl ? Resolve<RefNames<D[2]>, D[3] extends keyof Names ? Names[D[3]] : {}> : never;
-type Resolve<N, M> = N extends keyof M ? M[N] : N;
+type Resolve<N, M> = N extends string ? Lookup<M, N> : never;
 type RefNames<X> = X extends ["ref", infer N, infer As] ? N | RefNames<As> : X extends [infer H, ...infer R] ? RefNames<H> | RefNames<R> : never;
 
 // ---------------------------------------------------------------------------
@@ -964,7 +970,12 @@ type ReexportNames<In, P extends string, Rs extends any[]> =
 type Exported<In, P extends string, N> = Exports<In, P> extends infer E ? N extends keyof E ? E[N] : never : never;
 // the names a file sees: its own aliases, its imports, a namespace's members as `ns.name`
 type FileNames<In, P extends string> =
-  P extends keyof In ? (In[P] extends [infer L, infer Is extends any[], any] ? Flat<L & NamedImports<In, P, Is> & NsImports<In, P, Is>> : {}) : {};
+  P extends keyof In ? (In[P] extends [infer L, infer Is extends any[], any] ? Flat<L & NamedImports<In, P, Is> & NsImports<In, P, Is> & NoNames> : NoNames) : NoNames;
+// (a name table has an index signature of string: a name it lacks reads as
+// string, so a lookup is one property access, not a test against keyof of
+// every name)
+type NoNames = { [k: string]: string };
+type Lookup<M, N> = M[N & string & keyof M] extends infer V ? (V extends string ? (string extends V ? N : V) : N) : N;
 type NamedImports<In, P extends string, Is extends any[]> =
   { [I in keyof Is as I extends `${number}` ? (Is[I] extends ["named", infer L, any, any] ? L : never) : never]:
       Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<In, ResolvePath<P, Spec>, Im> : never };
