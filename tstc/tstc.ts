@@ -91,168 +91,168 @@ type Keyword = "any" | "unknown" | "never" | "string" | "number" | "bigint" | "s
 
 type Decl = [string, [string, any][], any];
 
-type ParseDecls<T extends any[], Acc extends Decl[] = []> =
-  T extends [["id", "export"], ...infer R extends any[]] ? ParseDecls<R, Acc>
-  : T extends [["id", "type"], ["id", infer N extends string], ...infer R extends any[]]
-    ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2 extends any[]]]
-      ? ParseType<R2> extends [infer B, infer R3 extends any[]]
-        ? ParseDecls<R3 extends [[";", ";"], ...infer R4 extends any[]] ? R4 : R3, [...Acc, [N, Ps, B]]>
+type ParseDecls<T, Acc extends Decl[] = []> =
+  T extends [["id", "export"], ...infer R] ? ParseDecls<R, Acc>
+  : T extends [["id", "type"], ["id", infer N extends string], ...infer R]
+    ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2]]
+      ? ParseType<R2> extends [infer B, infer R3]
+        ? ParseDecls<R3 extends [[";", ";"], ...infer R4] ? R4 : R3, [...Acc, [N, Ps, B]]>
         : Acc
       : Acc
   : Acc;
 
-type ParseParams<T extends any[]> =
-  T extends [["<", "<"], ...infer R extends any[]] ? ParseParamList<R> : [[], T];
+type ParseParams<T> =
+  T extends [["<", "<"], ...infer R] ? ParseParamList<R> : [[], T];
 
-type ParseParamList<T extends any[], Acc extends [string, any][] = []> =
-  T extends [[">", ">"], ...infer R extends any[]] ? [Acc, R]
-  : T extends [[",", ","], ...infer R extends any[]] ? ParseParamList<R, Acc>
-  : T extends [["id", infer N extends string], ...infer R extends any[]]
-    ? SkipConstraint<R> extends infer R2 extends any[]
-      ? R2 extends [["=", "="], ...infer R3 extends any[]]
-        ? ParseType<R3> extends [infer D, infer R4 extends any[]] ? ParseParamList<R4, [...Acc, [N, D]]> : never
+type ParseParamList<T, Acc extends [string, any][] = []> =
+  T extends [[">", ">"], ...infer R] ? [Acc, R]
+  : T extends [[",", ","], ...infer R] ? ParseParamList<R, Acc>
+  : T extends [["id", infer N extends string], ...infer R]
+    ? SkipConstraint<R> extends infer R2
+      ? R2 extends [["=", "="], ...infer R3]
+        ? ParseType<R3> extends [infer D, infer R4] ? ParseParamList<R4, [...Acc, [N, D]]> : never
         : ParseParamList<R2, [...Acc, [N, null]]>
       : never
   : never;
 
 // (constraints of type parameters do not change what an alias evaluates to)
-type SkipConstraint<T extends any[]> =
-  T extends [["id", "extends"], ...infer R extends any[]]
-    ? ParseType<R> extends [any, infer R2 extends any[]] ? R2 : never
+type SkipConstraint<T> =
+  T extends [["id", "extends"], ...infer R]
+    ? ParseType<R> extends [any, infer R2] ? R2 : never
     : T;
 
-type ParseType<T extends any[]> =
-  ParseUnion<T> extends [infer A, infer R extends any[]]
-    ? R extends [["id", "extends"], ...infer R2 extends any[]]
-      ? ParseUnion<R2> extends [infer E, [["?", "?"], ...infer R3 extends any[]]]
-        ? ParseType<R3> extends [infer X, [[":", ":"], ...infer R4 extends any[]]]
-          ? ParseType<R4> extends [infer Y, infer R5 extends any[]] ? [["cond", A, E, X, Y], R5] : never
+type ParseType<T> =
+  ParseUnion<T> extends [infer A, infer R]
+    ? R extends [["id", "extends"], ...infer R2]
+      ? ParseUnion<R2> extends [infer E, [["?", "?"], ...infer R3]]
+        ? ParseType<R3> extends [infer X, [[":", ":"], ...infer R4]]
+          ? ParseType<R4> extends [infer Y, infer R5] ? [["cond", A, E, X, Y], R5] : never
           : never
         : never
       : [A, R]
     : never;
 
-type ParseUnion<T extends any[]> =
-  (T extends [["|", "|"], ...infer R extends any[]] ? R : T) extends infer T2 extends any[]
-    ? ParseInter<T2> extends [infer A, infer R extends any[]] ? UnionLoop<[A], R> : never
+type ParseUnion<T> =
+  (T extends [["|", "|"], ...infer R] ? R : T) extends infer T2
+    ? ParseInter<T2> extends [infer A, infer R] ? UnionLoop<[A], R> : never
     : never;
-type UnionLoop<Xs extends any[], T extends any[]> =
-  T extends [["|", "|"], ...infer R extends any[]]
-    ? ParseInter<R> extends [infer A, infer R2 extends any[]] ? UnionLoop<[...Xs, A], R2> : never
+type UnionLoop<Xs extends any[], T> =
+  T extends [["|", "|"], ...infer R]
+    ? ParseInter<R> extends [infer A, infer R2] ? UnionLoop<[...Xs, A], R2> : never
     : [Xs extends [infer X] ? X : ["union", Xs], T];
 
-type ParseInter<T extends any[]> =
-  (T extends [["&", "&"], ...infer R extends any[]] ? R : T) extends infer T2 extends any[]
-    ? ParseOp<T2> extends [infer A, infer R extends any[]] ? InterLoop<[A], R> : never
+type ParseInter<T> =
+  (T extends [["&", "&"], ...infer R] ? R : T) extends infer T2
+    ? ParseOp<T2> extends [infer A, infer R] ? InterLoop<[A], R> : never
     : never;
-type InterLoop<Xs extends any[], T extends any[]> =
-  T extends [["&", "&"], ...infer R extends any[]]
-    ? ParseOp<R> extends [infer A, infer R2 extends any[]] ? InterLoop<[...Xs, A], R2> : never
+type InterLoop<Xs extends any[], T> =
+  T extends [["&", "&"], ...infer R]
+    ? ParseOp<R> extends [infer A, infer R2] ? InterLoop<[...Xs, A], R2> : never
     : [Xs extends [infer X] ? X : ["inter", Xs], T];
 
-type ParseOp<T extends any[]> =
-  T extends [["id", "keyof"], ...infer R extends any[]]
-    ? ParseOp<R> extends [infer A, infer R2 extends any[]] ? [["keyof", A], R2] : never
-  : T extends [["id", "readonly"], ...infer R extends any[]] ? ParseOp<R>
+type ParseOp<T> =
+  T extends [["id", "keyof"], ...infer R]
+    ? ParseOp<R> extends [infer A, infer R2] ? [["keyof", A], R2] : never
+  : T extends [["id", "readonly"], ...infer R] ? ParseOp<R>
   : ParsePostfix<T>;
 
-type ParsePostfix<T extends any[]> =
-  ParsePrimary<T> extends [infer A, infer R extends any[]] ? PostfixLoop<A, R> : never;
+type ParsePostfix<T> =
+  ParsePrimary<T> extends [infer A, infer R] ? PostfixLoop<A, R> : never;
 
-type PostfixLoop<A, T extends any[]> =
-  T extends [["[", "["], ["]", "]"], ...infer R extends any[]] ? PostfixLoop<["arr", A], R>
-  : T extends [["[", "["], ...infer R extends any[]]
-    ? ParseType<R> extends [infer K, [["]", "]"], ...infer R2 extends any[]]] ? PostfixLoop<["idx", A, K], R2> : never
+type PostfixLoop<A, T> =
+  T extends [["[", "["], ["]", "]"], ...infer R] ? PostfixLoop<["arr", A], R>
+  : T extends [["[", "["], ...infer R]
+    ? ParseType<R> extends [infer K, [["]", "]"], ...infer R2]] ? PostfixLoop<["idx", A, K], R2> : never
   : [A, T];
 
-type ParsePrimary<T extends any[]> =
-  T extends [["num", infer X extends string], ...infer R extends any[]] ? [["num", X], R]
-  : T extends [["big", infer X extends string], ...infer R extends any[]] ? [["big", X], R]
-  : T extends [["str", infer X extends string], ...infer R extends any[]] ? [["str", X], R]
-  : T extends [["tpl_full", infer X extends string], ...infer R extends any[]] ? [["tpl", [X], []], R]
-  : T extends [["tpl_start", infer X extends string], ...infer R extends any[]] ? ParseTpl<R, [X], []>
-  : T extends [["(", "("], ...infer R extends any[]]
+type ParsePrimary<T> =
+  T extends [["num", infer X extends string], ...infer R] ? [["num", X], R]
+  : T extends [["big", infer X extends string], ...infer R] ? [["big", X], R]
+  : T extends [["str", infer X extends string], ...infer R] ? [["str", X], R]
+  : T extends [["tpl_full", infer X extends string], ...infer R] ? [["tpl", [X], []], R]
+  : T extends [["tpl_start", infer X extends string], ...infer R] ? ParseTpl<R, [X], []>
+  : T extends [["(", "("], ...infer R]
     ? IsFnParams<R> extends true ? ParseFn<R>
-    : ParseType<R> extends [infer A, [[")", ")"], ...infer R2 extends any[]]] ? [A, R2] : never
-  : T extends [["[", "["], ...infer R extends any[]] ? ParseTuple<R>
-  : T extends [["{", "{"], ...infer R extends any[]] ? ParseObj<R>
-  : T extends [["id", "infer"], ["id", infer N extends string], ...infer R extends any[]]
-    ? R extends [["id", "extends"], ...infer R2 extends any[]]
-      ? ParseOp<R2> extends [infer C, infer R3 extends any[]] ? [["infer", N, C], R3] : never
+    : ParseType<R> extends [infer A, [[")", ")"], ...infer R2]] ? [A, R2] : never
+  : T extends [["[", "["], ...infer R] ? ParseTuple<R>
+  : T extends [["{", "{"], ...infer R] ? ParseObj<R>
+  : T extends [["id", "infer"], ["id", infer N extends string], ...infer R]
+    ? R extends [["id", "extends"], ...infer R2]
+      ? ParseOp<R2> extends [infer C, infer R3] ? [["infer", N, C], R3] : never
       : [["infer", N, null], R]
-  : T extends [["id", infer K extends Keyword], ...infer R extends any[]] ? [["kw", K], R]
-  : T extends [["id", infer N extends string], ["<", "<"], ...infer R extends any[]]
-    ? ParseArgs<R> extends [infer As, infer R2 extends any[]] ? [["ref", N, As], R2] : never
-  : T extends [["id", infer N extends string], ...infer R extends any[]] ? [["ref", N, []], R]
+  : T extends [["id", infer K extends Keyword], ...infer R] ? [["kw", K], R]
+  : T extends [["id", infer N extends string], ["<", "<"], ...infer R]
+    ? ParseArgs<R> extends [infer As, infer R2] ? [["ref", N, As], R2] : never
+  : T extends [["id", infer N extends string], ...infer R] ? [["ref", N, []], R]
   : never;
 
-type ParseTpl<T extends any[], Texts extends string[], Xs extends any[]> =
-  ParseType<T> extends [infer A, infer R extends any[]]
-    ? R extends [["tpl_mid", infer X extends string], ...infer R2 extends any[]] ? ParseTpl<R2, [...Texts, X], [...Xs, A]>
-    : R extends [["tpl_end", infer X extends string], ...infer R2 extends any[]] ? [["tpl", [...Texts, X], [...Xs, A]], R2]
+type ParseTpl<T, Texts extends string[], Xs extends any[]> =
+  ParseType<T> extends [infer A, infer R]
+    ? R extends [["tpl_mid", infer X extends string], ...infer R2] ? ParseTpl<R2, [...Texts, X], [...Xs, A]>
+    : R extends [["tpl_end", infer X extends string], ...infer R2] ? [["tpl", [...Texts, X], [...Xs, A]], R2]
     : never
     : never;
 
-type ParseArgs<T extends any[], Acc extends any[] = []> =
-  T extends [[">", ">"], ...infer R extends any[]] ? [Acc, R]
-  : T extends [[",", ","], ...infer R extends any[]] ? ParseArgs<R, Acc>
-  : ParseType<T> extends [infer A, infer R extends any[]] ? ParseArgs<R, [...Acc, A]> : never;
+type ParseArgs<T, Acc extends any[] = []> =
+  T extends [[">", ">"], ...infer R] ? [Acc, R]
+  : T extends [[",", ","], ...infer R] ? ParseArgs<R, Acc>
+  : ParseType<T> extends [infer A, infer R] ? ParseArgs<R, [...Acc, A]> : never;
 
-type ParseTuple<T extends any[], Acc extends any[] = []> =
-  T extends [["]", "]"], ...infer R extends any[]] ? [["tuple", Acc], R]
-  : T extends [[",", ","], ...infer R extends any[]] ? ParseTuple<R, Acc>
-  : T extends [["...", "..."], ...infer R extends any[]]
-    ? ParseType<R> extends [infer A, infer R2 extends any[]] ? ParseTuple<R2, [...Acc, ["rest", A]]> : never
-  : ParseType<T> extends [infer A, infer R extends any[]]
-    ? R extends [["?", "?"], ...infer R2 extends any[]] ? ParseTuple<R2, [...Acc, ["opt", A]]> : ParseTuple<R, [...Acc, ["req", A]]>
+type ParseTuple<T, Acc extends any[] = []> =
+  T extends [["]", "]"], ...infer R] ? [["tuple", Acc], R]
+  : T extends [[",", ","], ...infer R] ? ParseTuple<R, Acc>
+  : T extends [["...", "..."], ...infer R]
+    ? ParseType<R> extends [infer A, infer R2] ? ParseTuple<R2, [...Acc, ["rest", A]]> : never
+  : ParseType<T> extends [infer A, infer R]
+    ? R extends [["?", "?"], ...infer R2] ? ParseTuple<R2, [...Acc, ["opt", A]]> : ParseTuple<R, [...Acc, ["req", A]]>
     : never;
 
 // `(` starts a function type when `)` `=>`, `...`, or a name and `:`, `?`,
 // `,` or `)` follow
-type IsFnParams<T extends any[]> =
+type IsFnParams<T> =
   T extends [[")", ")"], ["=>", "=>"], ...any[]] ? true
   : T extends [["...", "..."], ...any[]] ? true
   : T extends [["id", string], [":" | "?" | "," | ")", string], ...any[]]
-    ? (T extends [any, [")", ")"], ...infer R extends any[]] ? (R extends [["=>", "=>"], ...any[]] ? true : false) : true)
+    ? (T extends [any, [")", ")"], ...infer R] ? (R extends [["=>", "=>"], ...any[]] ? true : false) : true)
   : false;
-type ParseFn<T extends any[], Ps extends [string, any, boolean][] = []> =
-  T extends [[")", ")"], ["=>", "=>"], ...infer R extends any[]]
-    ? ParseType<R> extends [infer Ret, infer R2 extends any[]] ? [["fn", Ps, Ret], R2] : never
-  : T extends [[",", ","], ...infer R extends any[]] ? ParseFn<R, Ps>
-  : (T extends [["...", "..."], ...infer R extends any[]] ? [true, R] : [false, T]) extends [infer Rest extends boolean, [["id", infer N extends string], ...infer R extends any[]]]
-    ? (R extends [["?", "?"], ...infer R2 extends any[]] ? R2 : R) extends infer R3 extends any[]
-      ? R3 extends [[":", ":"], ...infer R4 extends any[]]
-        ? ParseType<R4> extends [infer A, infer R5 extends any[]] ? ParseFn<R5, [...Ps, [N, A, Rest]]> : never
+type ParseFn<T, Ps extends [string, any, boolean][] = []> =
+  T extends [[")", ")"], ["=>", "=>"], ...infer R]
+    ? ParseType<R> extends [infer Ret, infer R2] ? [["fn", Ps, Ret], R2] : never
+  : T extends [[",", ","], ...infer R] ? ParseFn<R, Ps>
+  : (T extends [["...", "..."], ...infer R] ? [true, R] : [false, T]) extends [infer Rest extends boolean, [["id", infer N extends string], ...infer R]]
+    ? (R extends [["?", "?"], ...infer R2] ? R2 : R) extends infer R3
+      ? R3 extends [[":", ":"], ...infer R4]
+        ? ParseType<R4> extends [infer A, infer R5] ? ParseFn<R5, [...Ps, [N, A, Rest]]> : never
         : ParseFn<R3, [...Ps, [N, ["kw", "any"], Rest]]>
       : never
     : never;
 
 // object type literals: properties, or a mapped type
-type ParseObj<T extends any[], Acc extends any[] = []> =
-  T extends [["}", "}"], ...infer R extends any[]] ? [["obj", Acc], R]
-  : T extends [[";" | ",", string], ...infer R extends any[]] ? ParseObj<R, Acc>
-  : ParseMapped<T> extends [infer M, infer R extends any[]] ? [M, R]
-  : (T extends [["id", "readonly"], ["id" | "str" | "num", string], ...infer R extends any[]] ? [true, T extends [any, ...infer R2] ? R2 : never] : [false, T]) extends
-      [infer Ro extends boolean, [["id" | "str" | "num", infer N extends string], ...infer R extends any[]]]
-    ? (R extends [["?", "?"], ...infer R2 extends any[]] ? [true, R2] : [false, R]) extends [infer Opt extends boolean, [[":", ":"], ...infer R3 extends any[]]]
-      ? ParseType<R3> extends [infer A, infer R4 extends any[]] ? ParseObj<R4, [...Acc, [N, A, Opt, Ro]]> : never
+type ParseObj<T, Acc extends any[] = []> =
+  T extends [["}", "}"], ...infer R] ? [["obj", Acc], R]
+  : T extends [[";" | ",", string], ...infer R] ? ParseObj<R, Acc>
+  : ParseMapped<T> extends [infer M, infer R] ? [M, R]
+  : (T extends [["id", "readonly"], ["id" | "str" | "num", string], ...infer R] ? [true, T extends [any, ...infer R2] ? R2 : never] : [false, T]) extends
+      [infer Ro extends boolean, [["id" | "str" | "num", infer N extends string], ...infer R]]
+    ? (R extends [["?", "?"], ...infer R2] ? [true, R2] : [false, R]) extends [infer Opt extends boolean, [[":", ":"], ...infer R3]]
+      ? ParseType<R3> extends [infer A, infer R4] ? ParseObj<R4, [...Acc, [N, A, Opt, Ro]]> : never
       : never
     : never;
 
-type ParseMapped<T extends any[]> =
-  (T extends [["id", "readonly"], ...infer R extends any[]] ? [1, R]
-   : T extends [["+", "+"], ["id", "readonly"], ...infer R extends any[]] ? [1, R]
-   : T extends [["-", "-"], ["id", "readonly"], ...infer R extends any[]] ? [-1, R]
-   : [0, T]) extends [infer Ro extends number, [["[", "["], ["id", infer K extends string], ["id", "in"], ...infer R extends any[]]]
-    ? ParseType<R> extends [infer C, infer R2 extends any[]]
-      ? (R2 extends [["id", "as"], ...infer R3 extends any[]] ? (ParseType<R3> extends [infer A, infer R4 extends any[]] ? [A, R4] : never) : [null, R2]) extends
-          [infer As, [["]", "]"], ...infer R5 extends any[]]]
-        ? (R5 extends [["?", "?"], ...infer R6 extends any[]] ? [1, R6]
-           : R5 extends [["+", "+"], ["?", "?"], ...infer R6 extends any[]] ? [1, R6]
-           : R5 extends [["-", "-"], ["?", "?"], ...infer R6 extends any[]] ? [-1, R6]
-           : [0, R5]) extends [infer Opt extends number, [[":", ":"], ...infer R7 extends any[]]]
-          ? ParseType<R7> extends [infer B, infer R8 extends any[]]
-            ? (R8 extends [[";" | ",", string], ...infer R9 extends any[]] ? R9 : R8) extends [["}", "}"], ...infer R10 extends any[]]
+type ParseMapped<T> =
+  (T extends [["id", "readonly"], ...infer R] ? [1, R]
+   : T extends [["+", "+"], ["id", "readonly"], ...infer R] ? [1, R]
+   : T extends [["-", "-"], ["id", "readonly"], ...infer R] ? [-1, R]
+   : [0, T]) extends [infer Ro extends number, [["[", "["], ["id", infer K extends string], ["id", "in"], ...infer R]]
+    ? ParseType<R> extends [infer C, infer R2]
+      ? (R2 extends [["id", "as"], ...infer R3] ? (ParseType<R3> extends [infer A, infer R4] ? [A, R4] : never) : [null, R2]) extends
+          [infer As, [["]", "]"], ...infer R5]]
+        ? (R5 extends [["?", "?"], ...infer R6] ? [1, R6]
+           : R5 extends [["+", "+"], ["?", "?"], ...infer R6] ? [1, R6]
+           : R5 extends [["-", "-"], ["?", "?"], ...infer R6] ? [-1, R6]
+           : [0, R5]) extends [infer Opt extends number, [[":", ":"], ...infer R7]]
+          ? ParseType<R7> extends [infer B, infer R8]
+            ? (R8 extends [[";" | ",", string], ...infer R9] ? R9 : R8) extends [["}", "}"], ...infer R10]
               ? [["mapped", K, C, As, B, Ro, Opt], R10]
               : false
             : false
@@ -307,14 +307,14 @@ type Binders<X, P extends string> =
     ? [[P, K], ...Binders<C, `${P}.2`>, ...Binders<A, `${P}.3`>, ...Binders<B, `${P}.4`>]
   : X extends ["cond", infer A, infer E, infer T, infer F]
     ? [...Binders<A, `${P}.0`>, ...Binders<E, `${P}.1`>, ...Binders<T, `${P}.2`>, ...Binders<F, `${P}.3`>]
-  : X extends ["tuple", infer Es extends any[]] ? BindersList<{ [K in keyof Es]: Es[K][1] }, P>
-  : X extends ["union" | "inter", infer Xs extends any[]] ? BindersList<Xs, P>
-  : X extends ["tpl", any, infer Xs extends any[]] ? BindersList<Xs, P>
-  : X extends ["obj", infer Ps extends any[]] ? BindersList<{ [K in keyof Ps]: Ps[K][1] }, P>
-  : X extends ["fn", infer Ps extends any[], infer R] ? [...BindersList<{ [K in keyof Ps]: Ps[K][1] }, P>, ...Binders<R, `${P}.r`>]
+  : X extends ["tuple", infer Es] ? BindersList<{ [K in keyof Es]: Es[K][1] }, P>
+  : X extends ["union" | "inter", infer Xs] ? BindersList<Xs, P>
+  : X extends ["tpl", any, infer Xs] ? BindersList<Xs, P>
+  : X extends ["obj", infer Ps] ? BindersList<{ [K in keyof Ps]: Ps[K][1] }, P>
+  : X extends ["fn", infer Ps, infer R] ? [...BindersList<{ [K in keyof Ps]: Ps[K][1] }, P>, ...Binders<R, `${P}.r`>]
   : X extends ["arr" | "keyof", infer A] ? Binders<A, `${P}.0`>
   : X extends ["idx", infer A, infer K] ? [...Binders<A, `${P}.0`>, ...Binders<K, `${P}.1`>]
-  : X extends ["ref", string, infer As extends any[]] ? BindersList<As, P>
+  : X extends ["ref", string, infer As] ? BindersList<As, P>
   : [];
 type BindersList<Xs extends any[], P extends string, I extends 0[] = []> =
   Xs extends [infer A, ...infer R] ? [...Binders<A, `${P}.${I["length"]}`>, ...BindersList<R, P, [...I, 0]>] : [];
@@ -338,12 +338,12 @@ type Gen<X, P extends string, C extends Ctx> =
   : X extends ["arr", infer A] ? Op1<Gen<A, `${P}.0`, C>, P, "rt_array", ", i64 0">
   : X extends ["keyof", infer A] ? Op1<Gen<A, `${P}.0`, C>, P, "rt_keyof", "">
   : X extends ["idx", infer A, infer K] ? GenIdx<Gen<A, `${P}.0`, C>, Gen<K, `${P}.1`, C>, P>
-  : X extends ["tuple", infer Es extends any[]] ? GenTuple<Es, P, C>
-  : X extends ["union", infer Xs extends any[]] ? GenSet<Xs, P, C, "rt_union">
-  : X extends ["inter", infer Xs extends any[]] ? GenSet<Xs, P, C, "rt_inter">
-  : X extends ["tpl", infer Ts extends string[], infer Xs extends any[]] ? GenTpl<Ts, Xs, P, C>
-  : X extends ["fn", infer Ps extends any[], infer R] ? GenFn<Ps, R, P, C>
-  : X extends ["obj", infer Ps extends any[]] ? GenObj<Ps, P, C>
+  : X extends ["tuple", infer Es] ? GenTuple<Es, P, C>
+  : X extends ["union", infer Xs] ? GenSet<Xs, P, C, "rt_union">
+  : X extends ["inter", infer Xs] ? GenSet<Xs, P, C, "rt_inter">
+  : X extends ["tpl", infer Ts extends string[], infer Xs] ? GenTpl<Ts, Xs, P, C>
+  : X extends ["fn", infer Ps, infer R] ? GenFn<Ps, R, P, C>
+  : X extends ["obj", infer Ps] ? GenObj<Ps, P, C>
   : X extends ["mapped", any, any, any, any, any, any] ? GenMapped<X, P, C>
   : X extends ["cond", any, any, any, any] ? GenCond<X, P, C>
   : X extends ["infer", any, any] ? GenLoad<BinderSlot<C, P>, P>
@@ -351,7 +351,7 @@ type Gen<X, P extends string, C extends Ctx> =
     ? Op1<Gen<A, `${P}.0`, C>, P, "string_mapping", "", `i32 ${Intrinsic[N]}, `>
   : X extends ["ref", infer N extends string, []] ? (Slot<C[1], N> extends infer K extends number
       ? K extends -1 ? GenCall<N, [], P, C> : GenLoad<K, P> : never)
-  : X extends ["ref", infer N extends string, infer As extends any[]] ? GenCall<N, As, P, C>
+  : X extends ["ref", infer N extends string, infer As] ? GenCall<N, As, P, C>
   : ["", "18", ""];  // (not supported yet: never)
 
 type GenLoad<K extends number, P extends string> =
@@ -498,17 +498,19 @@ Lv:
 type PD = "{ i64, i64, ptr, i64, i64, ptr, ptr, ptr, ptr, ptr, ptr, i64 }";
 type PatName<C extends Ctx, P extends string> = `@"p${C[0]}${P}"`;
 // (Imp: the constraint an infer without one has where it is, as TypeScript
-// implies it: string in a template's placeholder, unknown[] as a rest element)
+// implies it: string in a template's placeholder. A rest element's implied
+// unknown[] is left out: what it infers is an array anyway, and checking it
+// relates every element of the rest)
 type Pat<X, P extends string, C extends Ctx, Imp extends string = "null"> =
   Binders<X, P> extends [] ? PatCode<X, P, C>
   : X extends ["infer", string, infer K]
     ? `${K extends null ? "" : Fn<`${C[0]}$pc${P}`, K, `${P}.2.p`, C>}${PatName<C, P>} = internal constant ${PD} { i64 1, i64 ${BinderSlot<C, P>}, ptr ${K extends null ? Imp : `@"${C[0]}$pc${P}"`}, i64 0, i64 0, ptr null, ptr null, ptr null, ptr null, ptr null, ptr null, i64 0 }\n`
-  : X extends ["tuple", infer Es extends any[]]
+  : X extends ["tuple", infer Es]
     ? `${PatTupleElems<Es, P, C>}${PatArray<Es, P, C>}@"pk${C[0]}${P}" = internal constant [${Es["length"]} x i64] [${Join<{ [K in keyof Es]: ElemKind[Es[K][0]] }, ", ">}]
 ${PatName<C, P>} = internal constant ${PD} { i64 2, i64 0, ptr null, i64 0, i64 ${Es["length"]}, ptr @"pe${C[0]}${P}", ptr @"pk${C[0]}${P}", ptr null, ptr null, ptr null, ptr null, i64 0 }\n`
-  : X extends ["tpl", infer Ts extends string[], infer Xs extends any[]]
+  : X extends ["tpl", infer Ts extends string[], infer Xs]
     ? `${PatElems<Xs, P, C, [], "@tstc0.string">}${PatArray<Xs, P, C>}${StrArray<Ts, C, `${P}.p`>}${PatName<C, P>} = internal constant ${PD} { i64 5, i64 0, ptr null, i64 0, i64 ${Xs["length"]}, ptr @"pe${C[0]}${P}", ptr null, ptr null, ptr null, ptr null, ptr @"ta.${C[0]}${P}.p", i64 0 }\n`
-  : X extends ["fn", infer Ps extends any[], infer R]
+  : X extends ["fn", infer Ps, infer R]
     ? `${PatFnElems<Ps, P, C>}${PatArray<Ps, P, C>}@"pk${C[0]}${P}" = internal constant [${Ps["length"] extends 0 ? 1 : Ps["length"]} x i64] [${Ps extends [] ? "i64 0" : Join<{ [K in keyof Ps]: Ps[K][2] extends true ? "i64 2" : "i64 0" }, ", ">}]
 ${Pat<R, `${P}.r`, C>}${PatName<C, P>} = internal constant ${PD} { i64 6, i64 0, ptr null, i64 0, i64 ${Ps["length"]}, ptr @"pe${C[0]}${P}", ptr @"pk${C[0]}${P}", ptr ${PatName<C, `${P}.r`>}, ptr null, ptr null, ptr null, i64 0 }\n`
   : PatCode<X, P, C>;
@@ -520,10 +522,10 @@ type PatElems<Xs extends any[], P extends string, C extends Ctx, I extends 0[] =
   Xs extends [infer A, ...infer R] ? `${Pat<A, `${P}.${I["length"]}`, C, Imp>}${PatElems<R, P, C, [...I, 0], Imp>}` : "";
 type PatTupleElems<Es extends any[], P extends string, C extends Ctx, I extends 0[] = []> =
   Es extends [[infer K, infer A], ...infer R]
-    ? `${Pat<A, `${P}.${I["length"]}`, C, K extends "rest" ? "@tstc0.array" : "null">}${PatTupleElems<R, P, C, [...I, 0]>}` : "";
+    ? `${Pat<A, `${P}.${I["length"]}`, C>}${PatTupleElems<R, P, C, [...I, 0]>}` : "";
 type PatFnElems<Ps extends any[], P extends string, C extends Ctx, I extends 0[] = []> =
   Ps extends [[string, infer A, infer Rest], ...infer R]
-    ? `${Pat<A, `${P}.${I["length"]}`, C, Rest extends true ? "@tstc0.array" : "null">}${PatFnElems<R, P, C, [...I, 0]>}` : "";
+    ? `${Pat<A, `${P}.${I["length"]}`, C>}${PatFnElems<R, P, C, [...I, 0]>}` : "";
 type PatArray<Xs extends any[], P extends string, C extends Ctx> =
   `@"pe${C[0]}${P}" = internal constant [${Xs["length"]} x ptr] [${Join<{ [K in keyof Xs]: `ptr ${PatName<C, `${P}.${K & string}`>}` }, ", ">}]\n`;
 
@@ -632,11 +634,6 @@ declare i64 @rt_memo_get(i64, ptr, i64, ptr)
 declare void @rt_memo_put(i64, i64)
 define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
-}
-define internal { i64, i64 } @tstc0.array(ptr %env) {
-  %a = call i64 @rt_array(i64 10, i64 0)
-  %r = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 %a, 0
-  ret { i64, i64 } %r
 }
 
 ${Join<{ [K in keyof Ds]: AliasIR<Ds[K], Ds, K & string> }>}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
