@@ -334,7 +334,20 @@ type ParseMapped<T> =
 // ---------------------------------------------------------------------------
 // Numbers and text
 
-type Len<S extends string, N extends 0[] = []> = S extends `${string}${infer R}` ? Len<R, [...N, 0]> : N["length"];
+// lengths as decimal text: counting in a tuple copies it at every step
+type Len<S extends string, N extends string = "0"> = S extends `${string}${infer R}` ? Len<R, Inc<N>> : N;
+type Inc<N extends string> =
+  N extends `${infer H}9` ? `${H extends "" ? "1" : Inc<H>}0` : N extends `${infer H}8` ? `${H}9` : N extends `${infer H}7` ? `${H}8`
+  : N extends `${infer H}6` ? `${H}7` : N extends `${infer H}5` ? `${H}6` : N extends `${infer H}4` ? `${H}5` : N extends `${infer H}3` ? `${H}4`
+  : N extends `${infer H}2` ? `${H}3` : N extends `${infer H}1` ? `${H}2` : N extends `${infer H}0` ? `${H}1` : "1";
+// twice a decimal: each digit doubled with the carry from the one after it
+type Dbl<N extends string, C extends 0 | 1 = 0> =
+  N extends "" ? (C extends 1 ? "1" : "") : LastDigit<N> extends [infer H extends string, infer D extends number]
+    ? DblT[D][C] extends [infer Y extends number, infer C2 extends 0 | 1] ? `${Dbl<H, C2>}${Y}` : never : never;
+type DblT = [[[0, 0], [1, 0]], [[2, 0], [3, 0]], [[4, 0], [5, 0]], [[6, 0], [7, 0]], [[8, 0], [9, 0]], [[0, 1], [1, 1]], [[2, 1], [3, 1]], [[4, 1], [5, 1]], [[6, 1], [7, 1]], [[8, 1], [9, 1]]];
+type LastDigit<N extends string> =
+  N extends `${infer H}0` ? [H, 0] : N extends `${infer H}1` ? [H, 1] : N extends `${infer H}2` ? [H, 2] : N extends `${infer H}3` ? [H, 3] : N extends `${infer H}4` ? [H, 4]
+  : N extends `${infer H}5` ? [H, 5] : N extends `${infer H}6` ? [H, 6] : N extends `${infer H}7` ? [H, 7] : N extends `${infer H}8` ? [H, 8] : N extends `${infer H}9` ? [H, 9] : never;
 type Range<N extends number, Acc extends number[] = []> = Acc["length"] extends N ? Acc : Range<N, [...Acc, Acc["length"]]>;
 type Plus<A extends number, B extends number> = [...Range<A>, ...Range<B>]["length"] & number;
 type IndexOf<X, L extends any[], I extends 0[] = []> =
@@ -409,7 +422,7 @@ type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], .
 type Gen<X, P extends string, C extends Ctx> =
   X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
   : X extends ["big", infer T extends string]
-    ? Len<T> extends 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18
+    ? Len<T> extends "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17" | "18"
       ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""]
       : [`  %r${P} = call i64 @mk_bigint_text(ptr ${StrName<C, P>})\n`, `%r${P}`, StrDef<T, C, P>]
   : X extends ["str", infer T extends string] ? ["", StrRef<C, P>, StrDef<T, C, P>]
@@ -448,8 +461,8 @@ type GenIdx<A extends G, K extends G, P extends string> =
 type StrName<C extends Ctx, P extends string> = `@"s.${C[0]}${P}"`;
 type StrRef<C extends Ctx, P extends string> = `ptrtoint (ptr ${StrName<C, P>} to i64)`;
 type StrDef<T extends string, C extends Ctx, P extends string> =
-  Len<T> extends infer L extends number
-    ? `${StrName<C, P>} = internal global { i32, i32, i32, i32, ptr, i32, i32, ptr, [${Plus<L, L>} x i8] } { i32 16, i32 0, i32 0, i32 ${L}, ptr getelementptr inbounds (i8, ptr ${StrName<C, P>}, i64 24), i32 ${L}, i32 -1, ptr getelementptr inbounds (i8, ptr ${StrName<C, P>}, i64 40), [${Plus<L, L>} x i8] c"${U16<T>}" }, align 8\n`
+  Len<T> extends infer L extends string
+    ? `${StrName<C, P>} = internal global { i32, i32, i32, i32, ptr, i32, i32, ptr, [${Dbl<L>} x i8] } { i32 16, i32 0, i32 0, i32 ${L}, ptr getelementptr inbounds (i8, ptr ${StrName<C, P>}, i64 24), i32 ${L}, i32 -1, ptr getelementptr inbounds (i8, ptr ${StrName<C, P>}, i64 40), [${Dbl<L>} x i8] c"${U16<T>}" }, align 8\n`
     : never;
 // static strings for each of the texts, and an array of them
 type StrArray<Ts extends string[], C extends Ctx, P extends string> =
@@ -937,7 +950,7 @@ define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
 }
 
-${DeclMap<Ds> extends infer M ? EffectSet<Ds, Names> extends infer Eff ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff> }> : never : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
+${DeclMap<Ds> extends infer M ? EffectSet<Ds, Names> extends infer Eff ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff> }> : never : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Inc<Len<Ds[K][0]>>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
 @tstc_entries = constant ptr @"tstc$entries"
 @tstc_nentries = constant i64 ${Ds["length"]}
 ${DumpList<Ds, MainFile> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
