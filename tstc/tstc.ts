@@ -414,6 +414,9 @@ type Gen<X, P extends string, C extends Ctx> =
   : X extends ["fn", infer Ps extends any[], infer R] ? GenFn<Ps, R, P, C>
   : X extends ["obj", infer Ps extends any[]] ? GenObj<Ps, P, C>
   : X extends ["mapped", any, any, any, any, any, any] ? GenMapped<X, P, C>
+  : X extends ["cond", ["obj", infer Ps extends any[]], ["infer", infer T extends string, null],
+      ["cond", infer K, ["infer", infer N extends string, ["keyof", ["ref", T, []]]], ["idx", ["ref", T, []], ["ref", N, []]], infer D], ["kw", "never"]]
+    ? GenDispatch<Ps, K, D, P, C>
   : X extends ["cond", any, any, any, any] ? GenCond<X, P, C>
   : X extends ["infer", any, any] ? (BinderSlot<C, P> extends infer K extends number ? (K extends -1 ? ["", "18", ""] : GenLoad<K, P>) : never)
   : X extends ["ref", infer N extends keyof Intrinsic, [infer A]]
@@ -508,6 +511,40 @@ type GenMapped<X, P extends string, C extends Ctx> =
         : never
       : never
     : never;
+
+// a table lookup with a default (go2types' dispatch tables): `{ "1": A;
+// "2": B } extends infer T ? K extends infer N extends keyof T ? T[N] : D :
+// never` is the property K names, else D, found by the runtime
+// (rt_dispatch); only that property is evaluated (the others may read a
+// heap the program has gone on with)
+type GenDispatch<Ps extends any[], K, D, P extends string, C extends Ctx> =
+  Gen<K, `${P}.3.0`, C> extends [infer KA extends string, infer KV extends string, infer KD extends string]
+    ? Gen<D, `${P}.3.3`, C> extends [infer DA extends string, infer DV extends string, infer DD extends string]
+      ? [`${KA}  %i${P} = call i64 @rt_dispatch(i64 ${KV}, ptr @"dd.${C[0]}${P}")
+  %n${P} = icmp slt i64 %i${P}, 0
+  br i1 %n${P}, label %Ld${P}, label %Lp${P}
+Lp${P}:
+  %fp${P} = getelementptr inbounds [${Ps["length"]} x ptr], ptr @"dt.${C[0]}${P}", i64 0, i64 %i${P}
+  %f${P} = load ptr, ptr %fp${P}
+  %c${P} = call { i64, i64 } %f${P}(ptr %env)
+  %vp${P} = extractvalue { i64, i64 } %c${P}, 0
+  br label %Lj${P}
+Ld${P}:
+${DA}  br label %Le${P}
+Le${P}:
+  br label %Lj${P}
+Lj${P}:
+  %r${P} = phi i64 [ %vp${P}, %Lp${P} ], [ ${DV}, %Le${P} ]
+`, `%r${P}`,
+         `${KD}${DD}${Join<DispatchFns<Ps, P, C>>}${Join<DispatchNames<Ps, C, P>>}@"dn.${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<DispatchNameRefs<Ps, C, P>, ", ">}]
+@"dt.${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<DispatchFnRefs<Ps, C, P>, ", ">}]
+@"dd.${C[0]}${P}" = internal global { i64, ptr, i64, ptr, i64, ptr, ptr } { i64 ${Ps["length"]}, ptr @"dn.${C[0]}${P}", i64 0, ptr null, i64 0, ptr null, ptr null }\n`]
+      : never
+    : never;
+type DispatchFns<Ps extends any[], P extends string, C extends Ctx> = { [K in keyof Ps]: Fn<`${C[0]}$dp${P}.${K & string}`, Ps[K][1], `${P}.0.${K & string}`, C> };
+type DispatchNames<Ps extends any[], C extends Ctx, P extends string> = { [K in keyof Ps]: StrDef<Ps[K][0], C, `${P}.dn${K & string}`> };
+type DispatchNameRefs<Ps extends any[], C extends Ctx, P extends string> = { [K in keyof Ps]: `ptr ${StrName<C, `${P}.dn${K & string}`>}` };
+type DispatchFnRefs<Ps extends any[], C extends Ctx, P extends string> = { [K in keyof Ps]: `ptr @"${C[0]}$dp${P}.${K & string}"` };
 
 // a call of the alias N: a frame at the top of the environment stack with its
 // arguments (and the defaults of those not given), then its function
@@ -842,6 +879,7 @@ declare i64 @rt_obj(ptr, ptr)
 declare i64 @rt_mapped(ptr, ptr)
 declare i64 @string_mapping(i32, i64)
 declare i64 @rt_cond(ptr, i64, ptr, ptr)
+declare i64 @rt_dispatch(i64, ptr)
 declare i64 @rt_memo_get(i64, ptr, i64, ptr)
 declare void @rt_memo_put(i64, i64)
 define internal { i64, i64 } @tstc0.string(ptr %env) {
