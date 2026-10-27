@@ -712,7 +712,9 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 // (the names of an alias's own functions and constants start with its
 // index: the paths of their nodes follow, each starting with a dot)
 type CtxOf<D extends Decl, Ds, Names, Id extends string, FT> =
-  [Id, Params<D[1]>, Ds, SlotTable<Binders<D[2], ".b">, { [K in keyof D[1]]: 0 }>, D[1]["length"], FT[D[0] & keyof FT] & number, D[3] extends keyof Names ? Names[D[3]] : NoNames, FT];
+  [Id, Params<D[1]>, Ds, SlotTable<Binders<D[2], ".b">, Zeros<D[1]>>, D[1]["length"], FT[D[0] & keyof FT] & number, D[3] extends keyof Names ? Names[D[3]] : NoNames, FT];
+// (mapped over a parameter: tuples map to tuples)
+type Zeros<L extends any[]> = { [K in keyof L]: 0 };
 // each alias's frame, by name (a call site reads its callee's)
 type FrameTable<Ds extends Decl[]> = TableOf<[...{ [K in keyof Ds]: [Ds[K][0], Frame<Ds[K]>] }, [string, 0]]>;
 type Params<Ps extends [string, any][], I extends 0[] = []> =
