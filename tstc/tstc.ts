@@ -686,13 +686,15 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 // An alias: its function (the body), one per default, and its entry for the
 // runtime's command line (arguments given, then the defaults)
 
-type CtxOf<D extends Decl, Ds, Names> =
-  [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : NoNames];
+// (the names of an alias's own functions and constants start with its
+// index: the paths of their nodes follow, each starting with a dot)
+type CtxOf<D extends Decl, Ds, Names, Id extends string> =
+  [Id, Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : NoNames];
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
 type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
-  CtxOf<D, Ds, Names> extends infer C extends Ctx
+  CtxOf<D, Ds, Names, Id> extends infer C extends Ctx
     ? IsNative<D> extends true
       ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
       : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
