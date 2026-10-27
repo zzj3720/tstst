@@ -353,7 +353,8 @@ type BindersList<Xs extends any[], P extends string, I extends 0[] = []> =
   Xs extends [infer A, ...infer R] ? [...Binders<A, `${P}.${I["length"]}`>, ...BindersList<R, P, [...I, 0]>] : [];
 
 // the slot of the binder at path Q
-type BinderSlot<C extends Ctx, Q extends string> = Plus<C[4], IndexOf<Q, PathsOf<C[3]>> & number>;
+type BinderSlot<C extends Ctx, Q extends string> =
+  IndexOf<Q, PathsOf<C[3]>> extends infer I extends number ? (I extends -1 ? -1 : Plus<C[4], I>) : never;
 type PathsOf<L extends [string, string][]> = { [K in keyof L]: L[K][0] };
 // the binders declared in the subtree at P, in scope
 type Bind<C extends Ctx, P extends string, L extends [string, string][] = C[3]> =
@@ -379,7 +380,7 @@ type Gen<X, P extends string, C extends Ctx> =
   : X extends ["obj", infer Ps extends any[]] ? GenObj<Ps, P, C>
   : X extends ["mapped", any, any, any, any, any, any] ? GenMapped<X, P, C>
   : X extends ["cond", any, any, any, any] ? GenCond<X, P, C>
-  : X extends ["infer", any, any] ? GenLoad<BinderSlot<C, P>, P>
+  : X extends ["infer", any, any] ? (BinderSlot<C, P> extends infer K extends number ? (K extends -1 ? ["", "18", ""] : GenLoad<K, P>) : never)
   : X extends ["ref", infer N extends keyof Intrinsic, [infer A]]
     ? Op1<Gen<A, `${P}.0`, C>, P, "string_mapping", "", `i32 ${Intrinsic[N]}, `>
   : X extends ["ref", infer N extends string, []] ? (Slot<C[1], N> extends infer K extends number
@@ -548,6 +549,10 @@ ${PatName<C, P>} = internal constant ${PD} { i64 2, i64 0, ptr null, i64 0, i64 
   : X extends ["fn", infer Ps extends any[], infer R]
     ? `${PatFnElems<Ps, P, C>}${PatArray<Ps, P, C>}@"pk${C[0]}${P}" = internal constant [${Ps["length"] extends 0 ? 1 : Ps["length"]} x i64] [${Ps extends [] ? "i64 0" : Join<{ [K in keyof Ps]: Ps[K][2] extends true ? "i64 2" : "i64 0" }, ", ">}]
 ${Pat<R, `${P}.r`, C>}${PatName<C, P>} = internal constant ${PD} { i64 6, i64 0, ptr null, i64 0, i64 ${Ps["length"]}, ptr @"pe${C[0]}${P}", ptr @"pk${C[0]}${P}", ptr ${PatName<C, `${P}.r`>}, ptr null, ptr null, ptr null, i64 0 }\n`
+  : X extends ["obj", infer Ps extends any[]]
+    ? `${PatElems<{ [K in keyof Ps]: Ps[K][1] }, P, C>}${PatArray<Ps, P, C>}${Join<{ [K in keyof Ps]: StrDef<Ps[K][0], C, `${P}.pn${K & string}`> }>}@"pn${C[0]}${P}" = internal constant [${Ps["length"]} x ptr] [${Join<{ [K in keyof Ps]: `ptr ${StrName<C, `${P}.pn${K & string}`>}` }, ", ">}]
+@"po${C[0]}${P}" = internal constant [${Ps["length"]} x i64] [${Join<{ [K in keyof Ps]: Ps[K][2] extends true ? "i64 1" : "i64 0" }, ", ">}]
+${PatName<C, P>} = internal constant ${PD} { i64 4, i64 0, ptr null, i64 0, i64 ${Ps["length"]}, ptr @"pe${C[0]}${P}", ptr null, ptr null, ptr @"pn${C[0]}${P}", ptr @"po${C[0]}${P}", ptr null, i64 0 }\n`
   : PatCode<X, P, C>;
 // (the extends type's function makes the same nodes: the pattern's own
 // copies are named apart, under the path's ".p")
