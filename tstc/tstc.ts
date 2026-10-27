@@ -285,7 +285,7 @@ type LLChar = { "\u0000": "\\00"; "\u0001": "\\01"; "\u0002": "\\02"; "\u0003": 
 // Gen<node, path, ctx> is [instructions, register, definitions]; names of
 // registers and globals are made of the node's path.
 
-type Ctx = [string, [string, number][], Decl[], [string, string][], number, number];
+type Ctx = [string, [string, number][], any, [string, string][], number, number];
 type G = [string, string, string];
 
 type Kw = { any: 0; unknown: 1; never: 2; string: 3; number: 4; bigint: 5; symbol: 6; object: 7;
@@ -296,8 +296,12 @@ type Intrinsic = { Uppercase: 0; Lowercase: 1; Capitalize: 2; Uncapitalize: 3 };
 type Slot<S extends [string, number][], N extends string> =
   S extends [...infer R extends [string, number][], [N, infer K extends number]] ? K
   : S extends [...infer R extends [string, number][], any] ? Slot<R, N> : -1;
-type FindDecl<D extends Decl[], N extends string> =
-  D extends [infer H extends Decl, ...infer R extends Decl[]] ? (H[0] extends N ? H : FindDecl<R, N>) : never;
+// the declarations by name: one object (a memoized alias's context holds it
+// as an object, hashed by identity, not as a tuple hashed through)
+type DeclMap<Ds, Acc = {}> =
+  Ds extends [infer D extends Decl, ...infer R] ? DeclMap<R, Acc & { [K in D[0]]: D }> : Flat<Acc>;
+type Flat<T> = { [K in keyof T]: T[K] };
+type FindDecl<M, N extends string> = N extends keyof M ? M[N] : false;
 type Frame<D extends Decl> = Plus<D[1]["length"], Binders<D[2], ".b">["length"]>;
 
 // the infers and mapped type keys of a node, [path, name] in order
@@ -533,12 +537,12 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 // An alias: its function (the body), one per default, and its entry for the
 // runtime's command line (arguments given, then the defaults)
 
-type CtxOf<D extends Decl, Ds extends Decl[]> =
+type CtxOf<D extends Decl, Ds> =
   [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>];
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
-type AliasIR<D extends Decl, Ds extends Decl[], Id extends string> =
+type AliasIR<D extends Decl, Ds, Id extends string> =
   CtxOf<D, Ds> extends infer C extends Ctx
     ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
@@ -636,7 +640,7 @@ define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
 }
 
-${Join<{ [K in keyof Ds]: AliasIR<Ds[K], Ds, K & string> }>}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
+${DeclMap<Ds> extends infer M ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, K & string> }> : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
 @tstc_entries = constant ptr @"tstc$entries"
 @tstc_nentries = constant i64 ${Ds["length"]}
 ${DumpList<Ds> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
