@@ -635,18 +635,18 @@ type PairNatives = "halloc" | "salloc" | "sappend" | "sappendv" | "scopy" | "s2b
   | "decoderune" | "shash128" | "clock_ms" | "pmap_get" | "cell_pmap_get";
 type BaseName<P extends string> = P extends `${string}/${infer R}` ? BaseName<R> : P;
 type NativeBody<D extends Decl> =
-  `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<{ [K in keyof D[1]]: "i64" }, ", ">})
+  `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<ArgTypes<D[1]>, ", ">})
 define internal { i64, i64 } @"${D[0]}$body"(ptr %env) {
 entry:
   %ok = call i1 @tstc0.libok()
   br i1 %ok, label %N, label %D
 N:
-${Join<{ [K in keyof D[1]]: `  %g${K & string} = getelementptr inbounds i64, ptr %env, i64 ${K & string}\n  %a${K & string} = load i64, ptr %g${K & string}\n` }>}${D[4] extends PairNatives
-  ? `  %p = call { i64, i64 } @n_${D[4]}(${Join<{ [K in keyof D[1]]: `i64 %a${K & string}` }, ", ">})
+${Join<ArgLoads<D[1]>>}${D[4] extends PairNatives
+  ? `  %p = call { i64, i64 } @n_${D[4]}(${Join<ArgRefs<D[1]>, ", ">})
   %p0 = extractvalue { i64, i64 } %p, 0
   %p1 = extractvalue { i64, i64 } %p, 1
   %v = call i64 @tstc0.box(i64 %p0, i64 %p1)`
-  : `  %v = call i64 @n_${D[4]}(${Join<{ [K in keyof D[1]]: `i64 %a${K & string}` }, ", ">})`}
+  : `  %v = call i64 @n_${D[4]}(${Join<ArgRefs<D[1]>, ", ">})`}
   %r = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 %v, 0
   ret { i64, i64 } %r
 D:
@@ -654,6 +654,10 @@ D:
   ret { i64, i64 } %d
 }
 `;
+// (mapped over a parameter: tuples map to tuples)
+type ArgTypes<Ps extends any[]> = { [K in keyof Ps]: "i64" };
+type ArgLoads<Ps extends any[]> = { [K in keyof Ps]: `  %g${K & string} = getelementptr inbounds i64, ptr %env, i64 ${K & string}\n  %a${K & string} = load i64, ptr %g${K & string}\n` };
+type ArgRefs<Ps extends any[]> = { [K in keyof Ps]: `i64 %a${K & string}` };
 // whether the lib's files in the program are the checked versions: their
 // texts (bytes) hashed once, at the first native call
 type LibCheck<Srcs extends [string, string][]> =
