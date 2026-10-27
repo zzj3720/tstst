@@ -533,10 +533,17 @@ type GenObj<Ps extends any[], P extends string, C extends Ctx> =
 type ObjFns<Ps extends any[], C extends Ctx, P extends string> = { [K in keyof Ps]:
   Ps[K][0] extends ""
     ? `${Fn<`${C[0]}$ok${P}.${K & string}`, Ps[K][4], `${P}.k${K & string}`, C>}${Fn<`${C[0]}$op${P}.${K & string}`, Ps[K][1], `${P}.${K & string}`, C>}`
-    : `${StrDef<Ps[K][0], C, `${P}.n${K & string}`>}${Fn<`${C[0]}$op${P}.${K & string}`, Ps[K][1], `${P}.${K & string}`, C>}` };
+    : `${StrDef<Ps[K][0], C, `${P}.n${K & string}`>}${PropPart<Ps[K][1], `${C[0]}$op${P}.${K & string}`, `${P}.${K & string}`, C>[0]}` };
+// a property's type: [definitions, function or null, constant or 0, slot or
+// -1] (a parameter or binder read from its slot, a constant as it is)
+type PropPart<X, Name extends string, P extends string, C extends Ctx> =
+  (X extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1) extends infer K extends number
+    ? K extends -1 ? [...Thunked<Name, X, P, C>, "-1"] : ["", "null", "0", `${K}`]
+    : never;
 type ObjProps<Ps extends any[], C extends Ctx, P extends string, I extends 0[] = [], Acc extends string[] = []> =
   Ps extends [infer E extends any[], ...infer R]
-    ? ObjProps<R, C, P, [...I, 0], E[0] extends "" ? Acc : [...Acc, `{ ptr, ptr, i64, i64, i64, i64, i64 } { ptr ${StrName<C, `${P}.n${I["length"]}`>}, ptr @"${C[0]}$op${P}.${I["length"]}", i64 0, i64 -1, i64 ${E[2] extends true ? 1 : 0}, i64 ${E[3] extends true ? 1 : 0}, i64 0 }`]>
+    ? ObjProps<R, C, P, [...I, 0], E[0] extends "" ? Acc : PropPart<E[1], `${C[0]}$op${P}.${I["length"]}`, `${P}.${I["length"]}`, C> extends [string, infer FP extends string, infer CV extends string, infer SL extends string]
+        ? [...Acc, `{ ptr, ptr, i64, i64, i64, i64, i64 } { ptr ${StrName<C, `${P}.n${I["length"]}`>}, ptr ${FP}, i64 ${CV}, i64 ${SL}, i64 ${E[2] extends true ? 1 : 0}, i64 ${E[3] extends true ? 1 : 0}, i64 0 }`] : never>
     : Acc;
 type ObjIndexes<Ps extends any[], C extends Ctx, P extends string, I extends 0[] = [], Acc extends string[] = []> =
   Ps extends [infer E extends any[], ...infer R]
@@ -622,28 +629,43 @@ type CondFns<X, P extends string, C extends Ctx> =
   X extends ["cond", infer A, infer E, infer T, infer F]
     ? Gen<A, `${P}.0`, C> extends [infer CA extends string, infer CV extends string, infer CD extends string]
       ? Binders<E, `${P}.1`> extends infer Is extends [string, string][]
-        ? `${CD}${Fn<`${C[0]}$e${P}`, E, `${P}.1`, WithScope<C, Bind<C, `${P}.1`>>>}${Is extends [] ? "" : Pat<E, `${P}.1`, C>}${Fn<`${C[0]}$t${P}`, T, `${P}.2`, WithScope<C, Bind<C, `${P}.1`>>>}${Fn<`${C[0]}$f${P}`, F, `${P}.3`, C>}@"${C[0]}$i${P}" = internal constant [${Plus<Is["length"], 1>} x i64] [${Join<[...{ [K in keyof Is]: `i64 ${BinderSlot<C, Is[K][0]>}` }, "i64 0"], ", ">}]
-@"${C[0]}$d${P}" = internal constant { i64, i64, ptr, i64, ptr, ptr, i64, ptr, i64, ptr, i64, ptr } { i64 ${C[5]}, i64 ${A extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1}, ptr @"${C[0]}$e${P}", i64 0, ptr ${Is extends [] ? "null" : `@"p${C[0]}${P}.1"`}, ptr @"${C[0]}$i${P}", i64 ${Is["length"]}, ptr @"${C[0]}$t${P}", i64 0, ptr @"${C[0]}$f${P}", i64 0, ptr @"${C[0]}$c${P}" }
+        ? WithScope<C, Bind<C, `${P}.1`>> extends infer CI extends Ctx
+          ? [Is extends [] ? Thunked<`${C[0]}$e${P}`, E, `${P}.1`, CI> : [Fn<`${C[0]}$e${P}`, E, `${P}.1`, CI>, `@"${C[0]}$e${P}"`, "0"],
+             Thunked<`${C[0]}$t${P}`, T, `${P}.2`, CI>, Thunked<`${C[0]}$f${P}`, F, `${P}.3`, C>] extends
+              [[infer ED extends string, infer EP extends string, infer EV extends string],
+               [infer TD extends string, infer TP extends string, infer TV extends string],
+               [infer FD extends string, infer FP extends string, infer FV extends string]]
+            ? `${CD}${ED}${Is extends [] ? "" : Pat<E, `${P}.1`, C>}${TD}${FD}@"${C[0]}$i${P}" = internal constant [${Plus<Is["length"], 1>} x i64] [${Join<[...{ [K in keyof Is]: `i64 ${BinderSlot<C, Is[K][0]>}` }, "i64 0"], ", ">}]
+@"${C[0]}$d${P}" = internal constant { i64, i64, ptr, i64, ptr, ptr, i64, ptr, i64, ptr, i64, ptr } { i64 ${C[5]}, i64 ${A extends ["ref", infer N extends string, []] ? Slot<C[1], N> : -1}, ptr ${EP}, i64 ${EV}, ptr ${Is extends [] ? "null" : `@"p${C[0]}${P}.1"`}, ptr @"${C[0]}$i${P}", i64 ${Is["length"]}, ptr ${TP}, i64 ${TV}, ptr ${FP}, i64 ${FV}, ptr @"${C[0]}$c${P}" }
 define internal { i64, i64 } @"${C[0]}$c${P}"(ptr %env) {
 entry:
   %out = alloca i64
 ${CA}  %d = call i64 @rt_cond(ptr @"${C[0]}$d${P}", i64 ${CV}, ptr %env, ptr %out)
   switch i64 %d, label %Lv [ i64 0, label %Lt i64 1, label %Lf ]
 Lt:
-  %t = musttail call { i64, i64 } @"${C[0]}$t${P}"(ptr %env)
-  ret { i64, i64 } %t
-Lf:
-  %f = musttail call { i64, i64 } @"${C[0]}$f${P}"(ptr %env)
-  ret { i64, i64 } %f
-Lv:
+${Branch<"t", TP, TV>}Lf:
+${Branch<"f", FP, FV>}Lv:
   %v = load i64, ptr %out
   %rv = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 %v, 0
   ret { i64, i64 } %rv
 }
 `
+            : never
+          : never
         : never
       : never
     : never;
+// a part of a descriptor: [definitions, its function or null, its constant
+// value or 0] (a part that reads nothing is its value, without a function)
+type Thunked<Name extends string, X, P extends string, C extends Ctx> =
+  Gen<X, P, C> extends [infer A extends string, infer V extends string, infer D extends string]
+    ? A extends "" ? [D, "null", V] : [Fn<Name, X, P, C>, `@"${Name}"`, "0"]
+    : never;
+// a branch of a conditional's function: its function's value, or its constant
+type Branch<K extends string, Ptr extends string, V extends string> =
+  Ptr extends "null"
+    ? `  %${K}v = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 ${V}, 0\n  ret { i64, i64 } %${K}v\n`
+    : `  %${K} = musttail call { i64, i64 } ${Ptr}(ptr %env)\n  ret { i64, i64 } %${K}\n`;
 
 // the infer pattern of an extends type (desc.h PatD): infers bound to their
 // slots, tuples, templates and function types matched part by part, anything
