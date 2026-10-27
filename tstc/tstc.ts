@@ -614,8 +614,9 @@ type Params<Ps extends [string, any][], I extends 0[] = []> =
 type AliasIR<D extends Decl, Ds, Names, Id extends string> =
   CtxOf<D, Ds, Names> extends infer C extends Ctx
     ? D[4] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
-    : BaseName<D[3]> extends keyof LibHashes
+    : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives
       ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
       : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
 
@@ -630,6 +631,10 @@ type LibHashes = {
   "heap.ts": "940415589675261843"; "int.ts": "-6424677977165027"; "map.ts": "-653147424055246936";
   "misc.ts": "-17566272838564479"; "rterr.ts": "5335410618643360334"; "softfloat.ts": "-2618646305736984855";
   "str.ts": "541375017417051346"; "tables.ts": "-1180400605690907689" };
+// what the runtime implements (the MoonBit tstc's lib_native_names: a tag
+// naming anything else, e.g. the goroutine scheduling its compiler handles
+// itself, keeps the definition)
+type LibNatives = "iadd" | "isub" | "imul" | "idiv" | "irem" | "iand" | "ior" | "ixor" | "iandnot" | "ishl" | "ishr" | "iushr" | "ineg" | "inot" | "ieq" | "ine" | "ilt" | "ile" | "igt" | "ige" | "iult" | "iule" | "iugt" | "iuge" | "iwrap" | "i2f" | "u2f" | "f2i" | "f2u" | "fadd" | "fsub" | "fmul" | "fdiv" | "feq" | "flt" | "fle" | "fneg" | "fne" | "slen" | "sat" | "sslice" | "scat" | "seq" | "scmp" | "slt" | "runestr" | "decoderune" | "vnew" | "vget" | "pmap_empty" | "hget" | "hset" | "halloc" | "panic" | "tset" | "tget" | "itoa" | "bnot" | "geq" | "gne" | "udiv" | "urem" | "f2bits" | "bits2f" | "fround32" | "uitoa" | "ffloor" | "fsqrt" | "isnan" | "ftoa" | "sappend" | "scopy" | "salloc" | "hinit" | "sidx" | "reslice" | "aslice" | "bytes2s" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "sindexbyte" | "sindex" | "scountbyte" | "sswap" | "ptrstr" | "sdata" | "f32bits" | "bits2f32" | "sclear" | "padd" | "hcopy" | "hloadt" | "hstoret" | "shash128" | "shash64" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "nilchk" | "ta1" | "ta2" | "bytestr" | "bstr" | "bappend" | "clock_ms" | "rterr" | "rtok" | "hgetf" | "hsetf" | "hgets" | "hsets" | "pmap_get" | "pmap_put" | "pmap_del" | "pmap_len" | "pmap_keys" | "pmap_step" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step" | "sappendv";
 // natives returning two results (the runtime's VPair)
 type PairNatives = "halloc" | "salloc" | "sappend" | "sappendv" | "scopy" | "s2bytes" | "s2runesl" | "ta2" | "srange"
   | "decoderune" | "shash128" | "clock_ms" | "pmap_get" | "cell_pmap_get";
