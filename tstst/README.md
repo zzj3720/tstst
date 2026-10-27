@@ -55,6 +55,7 @@ sh scripts/bl_native.sh compiler all -j 6 -q # translate the baseline driver, bu
 NOBUILD=1 sh scripts/bl_native.sh conformance all -j 6 -q
 python3 scripts/gotest.py internal/parser    # one package's go test, inside the type system
 sh scripts/gate.sh                           # everything checked before main moves
+BENCH=<ts-checker-bench> zsh scripts/checker_bench.sh  # real projects, next to the other checkers
 ```
 
 `scripts/baseline.py` runs a suite with an already built driver
@@ -70,7 +71,9 @@ sh scripts/gate.sh                           # everything checked before main mo
 - `lib/pure/` — the type-level runtime.
 - `drivers/` — programs built from tsgo: `baseline` (the compiler and
   conformance suites), `scan`, `parse`.
-- `scripts/` — suite runners, the gate, checks of lib/pure against `tsc`.
+- `scripts/` — suite runners, the gate, checks of lib/pure against `tsc`, the
+  real-project benchmark (`tsc_bench.sh`, `checker_bench.sh`).
+- `bench/real/` — benchmark runs on real projects and their chart.
 - `tests/` — lib/pure's tests (`pure/`), package lists for `go test`.
 
 ## License
