@@ -20,8 +20,8 @@ type Space = " " | "\n" | "\t" | "\r";
 type Tok = [string, string];
 type Escapes = { n: "\n"; t: "\t"; r: "\r"; b: "\b"; f: "\f"; v: "\v"; "0": "\0" };
 type Unescape<C extends string> = C extends keyof Escapes ? Escapes[C] : C;
-// \uXXXX of an ASCII character
-type Chr = ["\u0000", "\u0001", "\u0002", "\u0003", "\u0004", "\u0005", "\u0006", "\u0007", "\b", "\t", "\n", "\u000b", "\f", "\r", "\u000e", "\u000f", "\u0010", "\u0011", "\u0012", "\u0013", "\u0014", "\u0015", "\u0016", "\u0017", "\u0018", "\u0019", "\u001a", "\u001b", "\u001c", "\u001d", "\u001e", "\u001f", " ", "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~", "\u007f"];
+// \uXXXX and \xXX of a Latin-1 character
+type Chr = ["\u0000", "\u0001", "\u0002", "\u0003", "\u0004", "\u0005", "\u0006", "\u0007", "\b", "\t", "\n", "\u000b", "\f", "\r", "\u000e", "\u000f", "\u0010", "\u0011", "\u0012", "\u0013", "\u0014", "\u0015", "\u0016", "\u0017", "\u0018", "\u0019", "\u001a", "\u001b", "\u001c", "\u001d", "\u001e", "\u001f", " ", "!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~", "\u007f", "\u0080", "\u0081", "\u0082", "\u0083", "\u0084", "\u0085", "\u0086", "\u0087", "\u0088", "\u0089", "\u008a", "\u008b", "\u008c", "\u008d", "\u008e", "\u008f", "\u0090", "\u0091", "\u0092", "\u0093", "\u0094", "\u0095", "\u0096", "\u0097", "\u0098", "\u0099", "\u009a", "\u009b", "\u009c", "\u009d", "\u009e", "\u009f", "\u00a0", "\u00a1", "\u00a2", "\u00a3", "\u00a4", "\u00a5", "\u00a6", "\u00a7", "\u00a8", "\u00a9", "\u00aa", "\u00ab", "\u00ac", "\u00ad", "\u00ae", "\u00af", "\u00b0", "\u00b1", "\u00b2", "\u00b3", "\u00b4", "\u00b5", "\u00b6", "\u00b7", "\u00b8", "\u00b9", "\u00ba", "\u00bb", "\u00bc", "\u00bd", "\u00be", "\u00bf", "\u00c0", "\u00c1", "\u00c2", "\u00c3", "\u00c4", "\u00c5", "\u00c6", "\u00c7", "\u00c8", "\u00c9", "\u00ca", "\u00cb", "\u00cc", "\u00cd", "\u00ce", "\u00cf", "\u00d0", "\u00d1", "\u00d2", "\u00d3", "\u00d4", "\u00d5", "\u00d6", "\u00d7", "\u00d8", "\u00d9", "\u00da", "\u00db", "\u00dc", "\u00dd", "\u00de", "\u00df", "\u00e0", "\u00e1", "\u00e2", "\u00e3", "\u00e4", "\u00e5", "\u00e6", "\u00e7", "\u00e8", "\u00e9", "\u00ea", "\u00eb", "\u00ec", "\u00ed", "\u00ee", "\u00ef", "\u00f0", "\u00f1", "\u00f2", "\u00f3", "\u00f4", "\u00f5", "\u00f6", "\u00f7", "\u00f8", "\u00f9", "\u00fa", "\u00fb", "\u00fc", "\u00fd", "\u00fe", "\u00ff"];
 type HexVal = { "0": 0; "1": 1; "2": 2; "3": 3; "4": 4; "5": 5; "6": 6; "7": 7; "8": 8; "9": 9; "a": 10; "b": 11; "c": 12; "d": 13; "e": 14; "f": 15; "A": 10; "B": 11; "C": 12; "D": 13; "E": 14; "F": 15 };
 type Times16<N extends number> = Plus<Plus<Plus<Plus<N, N>, Plus<N, N>>, Plus<Plus<N, N>, Plus<N, N>>>, Plus<Plus<Plus<N, N>, Plus<N, N>>, Plus<Plus<N, N>, Plus<N, N>>>>;
 type HexChar<A extends string, B extends string> =
@@ -33,6 +33,7 @@ type Lex<S extends string, Acc extends Tok[] = [], St extends (0 | 1)[] = []> =
     : S extends `//${string}\n${infer R2}` ? Lex<R2, Acc, St>
     : S extends `/*${string}*/${infer R2}` ? Lex<R2, Acc, St>
     : C extends Alpha ? LexWord<R, C, Acc, St>
+    : S extends `0x${infer R2}` ? LexHex<R2, "", Acc, St>
     : C extends Digit ? LexNum<R, C, Acc, St>
     : S extends `-${infer D extends Digit}${infer R2}` ? LexNum<R2, `-${D}`, Acc, St>
     : C extends "\"" | "'" ? LexStr<R, C, "", Acc, St>
@@ -58,10 +59,27 @@ type LexNum<S extends string, W extends string, Acc extends Tok[], St extends (0
     : Lex<S, [...Acc, ["num", W]], St>
     : [...Acc, ["num", W]];
 
+type LexHex<S extends string, W extends string, Acc extends Tok[], St extends (0 | 1)[]> =
+  S extends `${infer C}${infer R}`
+    ? C extends keyof HexVal ? LexHex<R, `${W}${C}`, Acc, St>
+    : C extends "n" ? Lex<R, [...Acc, ["big", HexToDec<W>]], St>
+    : Lex<S, [...Acc, ["num", HexToDec<W>]], St>
+    : [...Acc, ["num", HexToDec<W>]];
+// the decimal text of hexadecimal digits: digits (least significant first)
+// times 16 plus the next, by a table of x * 16 + c = [digit, carry]
+type HexToDec<H extends string, D extends number[] = []> =
+  H extends `${infer C extends keyof HexVal}${infer R}` ? HexToDec<R, MulAdd16<D, HexVal[C]>> : DecText<D>;
+type MulAdd16<D extends number[], C extends number> =
+  D extends [infer X extends number, ...infer R extends number[]]
+    ? T16[X][C] extends [infer Y extends number, infer C2 extends number] ? [Y, ...MulAdd16<R, C2>] : never
+    : C extends 0 ? [] : T16[0][C] extends [infer Y extends number, infer C2 extends number] ? [Y, ...MulAdd16<[], C2>] : never;
+type DecText<D extends number[]> = D extends [] ? "0" : D extends [...infer R extends number[], infer X extends number] ? `${X}${DecText2<R>}` : "";
+type DecText2<D extends number[]> = D extends [...infer R extends number[], infer X extends number] ? `${X}${DecText2<R>}` : "";
+type T16 = [[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8, 0], [9, 0], [0, 1], [1, 1], [2, 1], [3, 1], [4, 1], [5, 1]], [[6, 1], [7, 1], [8, 1], [9, 1], [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2], [8, 2], [9, 2], [0, 3], [1, 3]], [[2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 3], [9, 3], [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4]], [[8, 4], [9, 4], [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [9, 5], [0, 6], [1, 6], [2, 6], [3, 6]], [[4, 6], [5, 6], [6, 6], [7, 6], [8, 6], [9, 6], [0, 7], [1, 7], [2, 7], [3, 7], [4, 7], [5, 7], [6, 7], [7, 7], [8, 7], [9, 7]], [[0, 8], [1, 8], [2, 8], [3, 8], [4, 8], [5, 8], [6, 8], [7, 8], [8, 8], [9, 8], [0, 9], [1, 9], [2, 9], [3, 9], [4, 9], [5, 9]], [[6, 9], [7, 9], [8, 9], [9, 9], [0, 10], [1, 10], [2, 10], [3, 10], [4, 10], [5, 10], [6, 10], [7, 10], [8, 10], [9, 10], [0, 11], [1, 11]], [[2, 11], [3, 11], [4, 11], [5, 11], [6, 11], [7, 11], [8, 11], [9, 11], [0, 12], [1, 12], [2, 12], [3, 12], [4, 12], [5, 12], [6, 12], [7, 12]], [[8, 12], [9, 12], [0, 13], [1, 13], [2, 13], [3, 13], [4, 13], [5, 13], [6, 13], [7, 13], [8, 13], [9, 13], [0, 14], [1, 14], [2, 14], [3, 14]], [[4, 14], [5, 14], [6, 14], [7, 14], [8, 14], [9, 14], [0, 15], [1, 15], [2, 15], [3, 15], [4, 15], [5, 15], [6, 15], [7, 15], [8, 15], [9, 15]]];
 type LexStr<S extends string, Q extends string, T extends string, Acc extends Tok[], St extends (0 | 1)[]> =
   S extends `${infer C}${infer R}`
     ? C extends Q ? Lex<R, [...Acc, ["str", T]], St>
-    : C extends "\\" ? (R extends `u00${infer A}${infer B}${infer R2}` ? LexStr<R2, Q, `${T}${HexChar<A, B>}`, Acc, St>
+    : C extends "\\" ? (R extends `u00${infer A}${infer B}${infer R2}` | `x${infer A}${infer B}${infer R2}` ? LexStr<R2, Q, `${T}${HexChar<A, B>}`, Acc, St>
       : R extends `${infer E}${infer R2}` ? LexStr<R2, Q, `${T}${Unescape<E>}`, Acc, St> : Acc)
     : LexStr<R, Q, `${T}${C}`, Acc, St>
     : Acc;
@@ -71,7 +89,7 @@ type LexStr<S extends string, Q extends string, T extends string, Acc extends To
 type LexTpl<S extends string, T extends string, Acc extends Tok[], St extends (0 | 1)[], End extends string, Hole extends string> =
   S extends `\`${infer R}` ? Lex<R, [...Acc, [End, T]], St>
   : S extends `\${${infer R}` ? Lex<R, [...Acc, [Hole, T]], [...St, 1]>
-  : S extends `\\u00${infer A}${infer B}${infer R}` ? LexTpl<R, `${T}${HexChar<A, B>}`, Acc, St, End, Hole>
+  : S extends `\\u00${infer A}${infer B}${infer R}` | `\\x${infer A}${infer B}${infer R}` ? LexTpl<R, `${T}${HexChar<A, B>}`, Acc, St, End, Hole>
   : S extends `\\${infer E}${infer R}` ? LexTpl<R, `${T}${Unescape<E>}`, Acc, St, End, Hole>
   : S extends `${infer C}${infer R}` ? LexTpl<R, `${T}${C}`, Acc, St, End, Hole>
   : Acc;
@@ -111,6 +129,12 @@ type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [],
       ? ParseFile<SkipSemi<R5>, F, Pre, Acc, Is, [...Rs, ...{ [K in keyof Ns]: [Ns[K][1], Ns[K][0], Spec] }]>
       : [Acc, Is, Rs]
   : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs>
+  : T extends [["id", "interface"], ["id", infer N extends string], ...infer R]
+    ? ParseParams<R> extends [infer Ps extends [string, any][], [["{", "{"], ...infer R2]]
+      ? ParseObj<R2> extends [infer B, infer R3]
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F]], Is, Rs>
+        : [Acc, Is, Rs]
+      : [Acc, Is, Rs]
   : T extends [["id", "type"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2]]
       ? ParseType<R2> extends [infer B, infer R3]
@@ -305,7 +329,7 @@ type Join<L extends string[], Sep extends string = ""> =
 type U16<S extends string, Acc extends string = ""> =
   S extends `${infer C}${infer R}` ? U16<R, `${Acc}${C extends keyof LLChar ? LLChar[C] : "?"}\\00`> : Acc;
 type CStr<S extends string> = `c"${S}\\00"`;
-type LLChar = { "\u0000": "\\00"; "\u0001": "\\01"; "\u0002": "\\02"; "\u0003": "\\03"; "\u0004": "\\04"; "\u0005": "\\05"; "\u0006": "\\06"; "\u0007": "\\07"; "\b": "\\08"; "\t": "\\09"; "\n": "\\0A"; "\u000b": "\\0B"; "\f": "\\0C"; "\r": "\\0D"; "\u000e": "\\0E"; "\u000f": "\\0F"; "\u0010": "\\10"; "\u0011": "\\11"; "\u0012": "\\12"; "\u0013": "\\13"; "\u0014": "\\14"; "\u0015": "\\15"; "\u0016": "\\16"; "\u0017": "\\17"; "\u0018": "\\18"; "\u0019": "\\19"; "\u001a": "\\1A"; "\u001b": "\\1B"; "\u001c": "\\1C"; "\u001d": "\\1D"; "\u001e": "\\1E"; "\u001f": "\\1F"; " ": " "; "!": "!"; "\"": "\\22"; "#": "#"; "$": "$"; "%": "%"; "&": "&"; "'": "'"; "(": "("; ")": ")"; "*": "*"; "+": "+"; ",": ","; "-": "-"; ".": "."; "/": "/"; "0": "0"; "1": "1"; "2": "2"; "3": "3"; "4": "4"; "5": "5"; "6": "6"; "7": "7"; "8": "8"; "9": "9"; ":": ":"; ";": ";"; "<": "<"; "=": "="; ">": ">"; "?": "?"; "@": "@"; "A": "A"; "B": "B"; "C": "C"; "D": "D"; "E": "E"; "F": "F"; "G": "G"; "H": "H"; "I": "I"; "J": "J"; "K": "K"; "L": "L"; "M": "M"; "N": "N"; "O": "O"; "P": "P"; "Q": "Q"; "R": "R"; "S": "S"; "T": "T"; "U": "U"; "V": "V"; "W": "W"; "X": "X"; "Y": "Y"; "Z": "Z"; "[": "["; "\\": "\\5C"; "]": "]"; "^": "^"; "_": "_"; "`": "`"; "a": "a"; "b": "b"; "c": "c"; "d": "d"; "e": "e"; "f": "f"; "g": "g"; "h": "h"; "i": "i"; "j": "j"; "k": "k"; "l": "l"; "m": "m"; "n": "n"; "o": "o"; "p": "p"; "q": "q"; "r": "r"; "s": "s"; "t": "t"; "u": "u"; "v": "v"; "w": "w"; "x": "x"; "y": "y"; "z": "z"; "{": "{"; "|": "|"; "}": "}"; "~": "~"; "\u007f": "\\7F" };
+type LLChar = { "\u0000": "\\00"; "\u0001": "\\01"; "\u0002": "\\02"; "\u0003": "\\03"; "\u0004": "\\04"; "\u0005": "\\05"; "\u0006": "\\06"; "\u0007": "\\07"; "\b": "\\08"; "\t": "\\09"; "\n": "\\0A"; "\u000b": "\\0B"; "\f": "\\0C"; "\r": "\\0D"; "\u000e": "\\0E"; "\u000f": "\\0F"; "\u0010": "\\10"; "\u0011": "\\11"; "\u0012": "\\12"; "\u0013": "\\13"; "\u0014": "\\14"; "\u0015": "\\15"; "\u0016": "\\16"; "\u0017": "\\17"; "\u0018": "\\18"; "\u0019": "\\19"; "\u001a": "\\1A"; "\u001b": "\\1B"; "\u001c": "\\1C"; "\u001d": "\\1D"; "\u001e": "\\1E"; "\u001f": "\\1F"; " ": " "; "!": "!"; "\"": "\\22"; "#": "#"; "$": "$"; "%": "%"; "&": "&"; "'": "'"; "(": "("; ")": ")"; "*": "*"; "+": "+"; ",": ","; "-": "-"; ".": "."; "/": "/"; "0": "0"; "1": "1"; "2": "2"; "3": "3"; "4": "4"; "5": "5"; "6": "6"; "7": "7"; "8": "8"; "9": "9"; ":": ":"; ";": ";"; "<": "<"; "=": "="; ">": ">"; "?": "?"; "@": "@"; "A": "A"; "B": "B"; "C": "C"; "D": "D"; "E": "E"; "F": "F"; "G": "G"; "H": "H"; "I": "I"; "J": "J"; "K": "K"; "L": "L"; "M": "M"; "N": "N"; "O": "O"; "P": "P"; "Q": "Q"; "R": "R"; "S": "S"; "T": "T"; "U": "U"; "V": "V"; "W": "W"; "X": "X"; "Y": "Y"; "Z": "Z"; "[": "["; "\\": "\\5C"; "]": "]"; "^": "^"; "_": "_"; "`": "`"; "a": "a"; "b": "b"; "c": "c"; "d": "d"; "e": "e"; "f": "f"; "g": "g"; "h": "h"; "i": "i"; "j": "j"; "k": "k"; "l": "l"; "m": "m"; "n": "n"; "o": "o"; "p": "p"; "q": "q"; "r": "r"; "s": "s"; "t": "t"; "u": "u"; "v": "v"; "w": "w"; "x": "x"; "y": "y"; "z": "z"; "{": "{"; "|": "|"; "}": "}"; "~": "~"; "\u007f": "\\7F"; "\u0080": "\\80"; "\u0081": "\\81"; "\u0082": "\\82"; "\u0083": "\\83"; "\u0084": "\\84"; "\u0085": "\\85"; "\u0086": "\\86"; "\u0087": "\\87"; "\u0088": "\\88"; "\u0089": "\\89"; "\u008a": "\\8A"; "\u008b": "\\8B"; "\u008c": "\\8C"; "\u008d": "\\8D"; "\u008e": "\\8E"; "\u008f": "\\8F"; "\u0090": "\\90"; "\u0091": "\\91"; "\u0092": "\\92"; "\u0093": "\\93"; "\u0094": "\\94"; "\u0095": "\\95"; "\u0096": "\\96"; "\u0097": "\\97"; "\u0098": "\\98"; "\u0099": "\\99"; "\u009a": "\\9A"; "\u009b": "\\9B"; "\u009c": "\\9C"; "\u009d": "\\9D"; "\u009e": "\\9E"; "\u009f": "\\9F"; "\u00a0": "\\A0"; "\u00a1": "\\A1"; "\u00a2": "\\A2"; "\u00a3": "\\A3"; "\u00a4": "\\A4"; "\u00a5": "\\A5"; "\u00a6": "\\A6"; "\u00a7": "\\A7"; "\u00a8": "\\A8"; "\u00a9": "\\A9"; "\u00aa": "\\AA"; "\u00ab": "\\AB"; "\u00ac": "\\AC"; "\u00ad": "\\AD"; "\u00ae": "\\AE"; "\u00af": "\\AF"; "\u00b0": "\\B0"; "\u00b1": "\\B1"; "\u00b2": "\\B2"; "\u00b3": "\\B3"; "\u00b4": "\\B4"; "\u00b5": "\\B5"; "\u00b6": "\\B6"; "\u00b7": "\\B7"; "\u00b8": "\\B8"; "\u00b9": "\\B9"; "\u00ba": "\\BA"; "\u00bb": "\\BB"; "\u00bc": "\\BC"; "\u00bd": "\\BD"; "\u00be": "\\BE"; "\u00bf": "\\BF"; "\u00c0": "\\C0"; "\u00c1": "\\C1"; "\u00c2": "\\C2"; "\u00c3": "\\C3"; "\u00c4": "\\C4"; "\u00c5": "\\C5"; "\u00c6": "\\C6"; "\u00c7": "\\C7"; "\u00c8": "\\C8"; "\u00c9": "\\C9"; "\u00ca": "\\CA"; "\u00cb": "\\CB"; "\u00cc": "\\CC"; "\u00cd": "\\CD"; "\u00ce": "\\CE"; "\u00cf": "\\CF"; "\u00d0": "\\D0"; "\u00d1": "\\D1"; "\u00d2": "\\D2"; "\u00d3": "\\D3"; "\u00d4": "\\D4"; "\u00d5": "\\D5"; "\u00d6": "\\D6"; "\u00d7": "\\D7"; "\u00d8": "\\D8"; "\u00d9": "\\D9"; "\u00da": "\\DA"; "\u00db": "\\DB"; "\u00dc": "\\DC"; "\u00dd": "\\DD"; "\u00de": "\\DE"; "\u00df": "\\DF"; "\u00e0": "\\E0"; "\u00e1": "\\E1"; "\u00e2": "\\E2"; "\u00e3": "\\E3"; "\u00e4": "\\E4"; "\u00e5": "\\E5"; "\u00e6": "\\E6"; "\u00e7": "\\E7"; "\u00e8": "\\E8"; "\u00e9": "\\E9"; "\u00ea": "\\EA"; "\u00eb": "\\EB"; "\u00ec": "\\EC"; "\u00ed": "\\ED"; "\u00ee": "\\EE"; "\u00ef": "\\EF"; "\u00f0": "\\F0"; "\u00f1": "\\F1"; "\u00f2": "\\F2"; "\u00f3": "\\F3"; "\u00f4": "\\F4"; "\u00f5": "\\F5"; "\u00f6": "\\F6"; "\u00f7": "\\F7"; "\u00f8": "\\F8"; "\u00f9": "\\F9"; "\u00fa": "\\FA"; "\u00fb": "\\FB"; "\u00fc": "\\FC"; "\u00fd": "\\FD"; "\u00fe": "\\FE"; "\u00ff": "\\FF" };
 
 // ---------------------------------------------------------------------------
 // Code generation. Ctx: [alias, scope [[name, slot]...], decls, binders
@@ -365,7 +389,10 @@ type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], .
 
 type Gen<X, P extends string, C extends Ctx> =
   X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
-  : X extends ["big", infer T extends string] ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""]
+  : X extends ["big", infer T extends string]
+    ? Len<T> extends 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18
+      ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""]
+      : [`  %r${P} = call i64 @mk_bigint_text(ptr ${StrName<C, P>})\n`, `%r${P}`, StrDef<T, C, P>]
   : X extends ["str", infer T extends string] ? ["", StrRef<C, P>, StrDef<T, C, P>]
   : X extends ["kw", "boolean"] ? [`  %r${P} = call i64 @rt_union2(i64 90, i64 98)\n`, `%r${P}`, ""]
   : X extends ["kw", infer K extends keyof Kw] ? ["", `${Imm<Kw[K]>}`, ""]
@@ -656,6 +683,7 @@ type NoInfer<T> = T;
 type Module<Ds extends Decl[], Names, MainFile extends string> = `; generated by tstc0
 @tstc_top = external global ptr
 declare i64 @mk_num(double)
+declare i64 @mk_bigint_text(ptr)
 declare i64 @rt_union2(i64, i64)
 declare i64 @rt_union(ptr, i64)
 declare i64 @rt_inter(ptr, i64)
@@ -715,34 +743,35 @@ type ParseAll<Fs extends [string, string][], I extends 0[] = []> =
   Fs extends [[infer P extends string, infer T extends string], ...infer R extends [string, string][]]
     ? [[P, ...ParseFile<Lex<T>, P, I extends [] | [0] ? "" : `${P}:`>], ...ParseAll<R, [...I, 0]>]
     : [];
-type FileOf<Files, P extends string> = Files extends [infer H extends [string, any, any, any], ...infer R] ? (H[0] extends P ? H : FileOf<R, P>) : never;
+// what each file declares, imports and re-exports, by path: [its aliases
+// by name, imports, re-exports] (an object: memoized aliases taking it hash
+// it by identity, not through every declaration's body)
+type InfoOf<Files> = {
+  [I in keyof Files as I extends `${number}` ? (Files[I] extends [infer P extends string, any, any, any] ? P : never) : never]:
+    Files[I] extends [string, infer Ds extends Decl[], infer Is, infer Rs] ? [LocalNames<Ds>, Is, Rs] : never };
 // what a file exports: its aliases and what it re-exports, by name
-type Exports<Files, P extends string> =
-  FileOf<Files, P> extends [string, infer Ds extends Decl[], any, infer Rs extends any[]]
-    ? Flat<LocalNames<Ds> & ReexportNames<Files, P, Rs>>
-    : {};
+type Exports<In, P extends string> =
+  P extends keyof In ? (In[P] extends [infer L, any, infer Rs extends any[]] ? Flat<L & ReexportNames<In, P, Rs>> : {}) : {};
 type LocalNames<Ds extends Decl[]> =
   { [I in keyof Ds as I extends `${number}` ? ShortName<Ds[I][0]> : never]: Ds[I][0] };
 type ShortName<N> = N extends `${string}:${infer S}` ? S : N;
-type ReexportNames<Files, P extends string, Rs extends any[]> =
-  { [I in keyof Rs as I extends `${number}` ? Rs[I][0] : never]: Exported<Files, ResolvePath<P, Rs[I][2]>, Rs[I][1]> };
-type Exported<Files, P extends string, N> = Exports<Files, P> extends infer E ? N extends keyof E ? E[N] : never : never;
+type ReexportNames<In, P extends string, Rs extends any[]> =
+  { [I in keyof Rs as I extends `${number}` ? Rs[I][0] : never]: Exported<In, ResolvePath<P, Rs[I][2]>, Rs[I][1]> };
+type Exported<In, P extends string, N> = Exports<In, P> extends infer E ? N extends keyof E ? E[N] : never : never;
 // the names a file sees: its own aliases, its imports, a namespace's members as `ns.name`
-type FileNames<Files, F extends [string, Decl[], any[], any[]]> =
-  Flat<LocalNames<F[1]> & NamedImports<Files, F[0], F[2]> & NsImports<Files, F[0], F[2]>>;
-type NamedImports<Files, P extends string, Is extends any[]> =
+type FileNames<In, P extends string> =
+  P extends keyof In ? (In[P] extends [infer L, infer Is extends any[], any] ? Flat<L & NamedImports<In, P, Is> & NsImports<In, P, Is>> : {}) : {};
+type NamedImports<In, P extends string, Is extends any[]> =
   { [I in keyof Is as I extends `${number}` ? (Is[I] extends ["named", infer L, any, any] ? L : never) : never]:
-      Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<Files, ResolvePath<P, Spec>, Im> : never };
+      Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<In, ResolvePath<P, Spec>, Im> : never };
 // (a namespace's members as `ns.name`: few namespaces, so an intersection)
-type NsImports<Files, P extends string, Is extends any[], Acc = {}> =
+type NsImports<In, P extends string, Is extends any[], Acc = {}> =
   Is extends [infer I, ...infer R extends any[]]
-    ? NsImports<Files, P, R, I extends ["ns", infer NS extends string, infer Spec extends string]
-        ? Acc & (Exports<Files, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never)
+    ? NsImports<In, P, R, I extends ["ns", infer NS extends string, infer Spec extends string]
+        ? Acc & (Exports<In, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never)
         : Acc>
     : Acc;
-type NamesOf<Files> = Flat<NamesAcc<Files>>;
-type NamesAcc<Files, Acc = {}> =
-  Files extends [infer F extends [string, Decl[], any[], any[]], ...infer R] ? NamesAcc<R, Acc & { [K in F[0]]: FileNames<Files, F> }> : Acc;
+type NamesOf<Files> = InfoOf<Files> extends infer In ? { [P in keyof In]: FileNames<In, P & string> } : never;
 type AllDecls<Files> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? [...Ds, ...AllDecls<R>] : [];
 
 type Main<Pack extends string = ""> =
