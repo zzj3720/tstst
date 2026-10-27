@@ -297,6 +297,11 @@ type ParseObj<T, Acc extends any[] = []> =
   T extends [["}", "}"], ...infer R] ? [["obj", Acc], R]
   : T extends [[";" | ",", string], ...infer R] ? ParseObj<R, Acc>
   : ParseMapped<T> extends [infer M, infer R] ? [M, R]
+  : (T extends [["id", "readonly"], ["[", "["], ...infer R] ? [true, R] : T extends [["[", "["], ...infer R] ? [false, R] : [false, false]) extends
+      [infer Ro extends boolean, [["id", string], [":", ":"], ...infer R]]
+    ? ParseType<R> extends [infer K, [["]", "]"], [":", ":"], ...infer R2]]
+      ? ParseType<R2> extends [infer A, infer R3] ? ParseObj<R3, [...Acc, ["", A, false, Ro, K]]> : never
+      : never
   : (T extends [["id", "readonly"], ["id" | "str" | "num", string], ...infer R] ? [true, T extends [any, ...infer R2] ? R2 : never] : [false, T]) extends
       [infer Ro extends boolean, [["id" | "str" | "num", infer N extends string], ...infer R]]
     ? (R extends [["?", "?"], ...infer R2] ? [true, R2] : [false, R]) extends [infer Opt extends boolean, [[":", ":"], ...infer R3]]
@@ -501,10 +506,26 @@ type FnDesc<Ps extends any[], P extends string, C extends Ctx> =
 
 // object types: each property's type a function of the frame, evaluated
 // when the property is read
+// (an index signature is an entry named "": [ "", value, false, ro, key ])
 type GenObj<Ps extends any[], P extends string, C extends Ctx> =
-  [`  %r${P} = call i64 @rt_obj(ptr @"od.${C[0]}${P}", ptr %env)\n`, `%r${P}`,
-   `${Join<{ [K in keyof Ps]: `${StrDef<Ps[K][0], C, `${P}.n${K & string}`>}${Fn<`${C[0]}$op${P}.${K & string}`, Ps[K][1], `${P}.${K & string}`, C>}` }>}@"op.${C[0]}${P}" = internal constant [${Ps["length"] extends 0 ? 1 : Ps["length"]} x { ptr, ptr, i64, i64, i64, i64, i64 }] [${Ps extends [] ? "{ ptr, ptr, i64, i64, i64, i64, i64 } zeroinitializer" : Join<{ [K in keyof Ps]: `{ ptr, ptr, i64, i64, i64, i64, i64 } { ptr ${StrName<C, `${P}.n${K & string}`>}, ptr @"${C[0]}$op${P}.${K & string}", i64 0, i64 -1, i64 ${Ps[K][2] extends true ? 1 : 0}, i64 ${Ps[K][3] extends true ? 1 : 0}, i64 0 }` }, ", ">}]
-@"od.${C[0]}${P}" = internal constant { i64, i64, ptr, i64, ptr, i64, ptr } { i64 ${C[5]}, i64 ${Ps["length"]}, ptr @"op.${C[0]}${P}", i64 0, ptr null, i64 0, ptr null }\n`];
+  [ObjProps<Ps, C, P>, ObjIndexes<Ps, C, P>] extends [infer PL extends string[], infer IL extends string[]]
+    ? [`  %r${P} = call i64 @rt_obj(ptr @"od.${C[0]}${P}", ptr %env)\n`, `%r${P}`,
+       `${Join<ObjFns<Ps, C, P>>}@"op.${C[0]}${P}" = internal constant [${PL["length"] extends 0 ? 1 : PL["length"]} x { ptr, ptr, i64, i64, i64, i64, i64 }] [${PL extends [] ? "{ ptr, ptr, i64, i64, i64, i64, i64 } zeroinitializer" : Join<PL, ", ">}]
+@"oi.${C[0]}${P}" = internal constant [${IL["length"] extends 0 ? 1 : IL["length"]} x { ptr, ptr, i64 }] [${IL extends [] ? "{ ptr, ptr, i64 } zeroinitializer" : Join<IL, ", ">}]
+@"od.${C[0]}${P}" = internal constant { i64, i64, ptr, i64, ptr, i64, ptr } { i64 ${C[5]}, i64 ${PL["length"]}, ptr @"op.${C[0]}${P}", i64 ${IL["length"]}, ptr @"oi.${C[0]}${P}", i64 0, ptr null }\n`]
+    : never;
+type ObjFns<Ps extends any[], C extends Ctx, P extends string> = { [K in keyof Ps]:
+  Ps[K][0] extends ""
+    ? `${Fn<`${C[0]}$ok${P}.${K & string}`, Ps[K][4], `${P}.k${K & string}`, C>}${Fn<`${C[0]}$op${P}.${K & string}`, Ps[K][1], `${P}.${K & string}`, C>}`
+    : `${StrDef<Ps[K][0], C, `${P}.n${K & string}`>}${Fn<`${C[0]}$op${P}.${K & string}`, Ps[K][1], `${P}.${K & string}`, C>}` };
+type ObjProps<Ps extends any[], C extends Ctx, P extends string, I extends 0[] = [], Acc extends string[] = []> =
+  Ps extends [infer E extends any[], ...infer R]
+    ? ObjProps<R, C, P, [...I, 0], E[0] extends "" ? Acc : [...Acc, `{ ptr, ptr, i64, i64, i64, i64, i64 } { ptr ${StrName<C, `${P}.n${I["length"]}`>}, ptr @"${C[0]}$op${P}.${I["length"]}", i64 0, i64 -1, i64 ${E[2] extends true ? 1 : 0}, i64 ${E[3] extends true ? 1 : 0}, i64 0 }`]>
+    : Acc;
+type ObjIndexes<Ps extends any[], C extends Ctx, P extends string, I extends 0[] = [], Acc extends string[] = []> =
+  Ps extends [infer E extends any[], ...infer R]
+    ? ObjIndexes<R, C, P, [...I, 0], E[0] extends "" ? [...Acc, `{ ptr, ptr, i64 } { ptr @"${C[0]}$ok${P}.${I["length"]}", ptr @"${C[0]}$op${P}.${I["length"]}", i64 ${E[3] extends true ? 1 : 0} }`] : Acc>
+    : Acc;
 
 // mapped types: the key in its slot; `keyof X` constraints keep X's
 // modifiers (homomorphic when X is a type variable)
