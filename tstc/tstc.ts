@@ -32,7 +32,9 @@ type Lex<S extends string, Acc extends Tok[] = [], St extends (0 | 1)[] = []> =
     ? C extends Space ? Lex<R, Acc, St>
     : S extends `//${string}\n${infer R2}` ? Lex<R2, Acc, St>
     : S extends `/*${infer Body}*/${infer R2}`
-      ? Body extends `${string}@native ${infer N}` ? Lex<R2, [...Acc, ["native", NativeName<N>]], St> : Lex<R2, Acc, St>
+      ? Body extends `${string}@native ${infer N}` ? Lex<R2, [...Acc, ["native", NativeName<N>]], St>
+      : Body extends `${string}@catch ${infer N}` ? Lex<R2, [...Acc, ["catch", HandlerName<N>]], St>
+      : Lex<R2, Acc, St>
     : C extends Alpha ? LexWord<R, C, Acc, St>
     : S extends `0x${infer R2}` ? LexHex<R2, "", Acc, St>
     : C extends Digit ? LexNum<R, C, Acc, St>
@@ -50,6 +52,8 @@ type Lex<S extends string, Acc extends Tok[] = [], St extends (0 | 1)[] = []> =
 
 type NativeName<S extends string, W extends string = ""> =
   S extends `${infer C}${infer R}` ? (C extends Lower | Digit | "_" ? NativeName<R, `${W}${C}`> : W) : W;
+type HandlerName<S extends string, W extends string = ""> =
+  S extends `${infer C}${infer R}` ? (C extends AlNum ? HandlerName<R, `${W}${C}`> : W) : W;
 type LexWord<S extends string, W extends string, Acc extends Tok[], St extends (0 | 1)[]> =
   S extends `${infer C}${infer R}`
     ? C extends AlNum ? LexWord<R, `${W}${C}`, Acc, St> : Lex<S, [...Acc, ["id", W]], St>
@@ -113,14 +117,15 @@ type Keyword = "any" | "unknown" | "never" | "string" | "number" | "bigint" | "s
   | "null" | "undefined" | "void" | "true" | "false" | "boolean";
 
 // [global name, parameters, body, file, native (a doc comment's `@native
-// name`, or "")]: a file's aliases are named
+// name`, or ""), handler (`@catch H`, or "")]: a file's aliases are named
 // `file:name`, but for the lib's and the program's own (the first file)
-type Decl = [string, [string, any][], any, string, string];
+type Decl = [string, [string, any][], any, string, string, string];
 
 // a file: [declarations, imports [["ns", name, spec] | ["named", local,
 // imported, spec]...], re-exports [[exported, imported, spec]...]]
-type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [], Is extends any[] = [], Rs extends any[] = [], Nat extends string = ""> =
-  T extends [["native", infer X extends string], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, X>
+type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [], Is extends any[] = [], Rs extends any[] = [], Nat extends string = "", Cat extends string = ""> =
+  T extends [["native", infer X extends string], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, X, Cat>
+  : T extends [["catch", infer X extends string], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, Nat, X>
   : T extends [["id", "import"], ...infer R]
     ? (R extends [["id", "type"], ...infer R2] ? R2 : R) extends infer R3
       ? R3 extends [["*", "*"], ["id", "as"], ["id", infer NS extends string], ["id", "from"], ["str", infer Spec extends string], ...infer R4]
@@ -135,17 +140,17 @@ type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [],
     ? ParseNames<R> extends [infer Ns extends [string, string][], [["id", "from"], ["str", infer Spec extends string], ...infer R5]]
       ? ParseFile<SkipSemi<R5>, F, Pre, Acc, Is, [...Rs, ...{ [K in keyof Ns]: [Ns[K][1], Ns[K][0], Spec] }]>
       : [Acc, Is, Rs]
-  : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, Nat>
+  : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, Nat, Cat>
   : T extends [["id", "interface"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["{", "{"], ...infer R2]]
       ? ParseObj<R2> extends [infer B, infer R3]
-        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat]], Is, Rs>
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat, Cat]], Is, Rs>
         : [Acc, Is, Rs]
       : [Acc, Is, Rs]
   : T extends [["id", "type"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2]]
       ? ParseType<R2> extends [infer B, infer R3]
-        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat]], Is, Rs>
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat, Cat]], Is, Rs>
         : [Acc, Is, Rs]
       : [Acc, Is, Rs]
   : [Acc, Is, Rs];
@@ -652,9 +657,24 @@ type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
   CtxOf<D, Ds, Names> extends infer C extends Ctx
     ? IsNative<D> extends true
       ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
-      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends keyof Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends keyof Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Caught<D, C>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
 type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives ? true : false : false;
+// `@catch H`: the body runs under tstc_try (rt/try.c); a failure (a native's
+// Panic<M>) in it makes the alias H<M, S> instead, S the store's current
+// version (H's entry for the runtime's command line takes them)
+type Caught<D extends Decl, C extends Ctx> =
+  (D[5] extends keyof C[6] ? C[6][D[5]] & string : D[5]) extends infer H extends string
+    ? FindDecl<C[2], H> extends infer HD extends Decl
+      ? `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
+entry:
+  %c = call { i64, i64 } @tstc_try(ptr @"${D[0]}$body", ptr @"${H}.w", i64 ${HD[1]["length"]}, ptr %env, i64 0, i64 0, i64 0, i64 0, i64 0)
+  ret { i64, i64 } %c
+}
+`
+      : Plain<D>
+    : never;
 // an alias not looked up in the memo table: its body
 type Plain<D extends Decl> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
 entry:
@@ -880,6 +900,7 @@ declare i64 @rt_mapped(ptr, ptr)
 declare i64 @string_mapping(i32, i64)
 declare i64 @rt_cond(ptr, i64, ptr, ptr)
 declare i64 @rt_dispatch(i64, ptr)
+declare { i64, i64 } @tstc_try(ptr, ptr, i64, ptr, i64, i64, i64, i64, i64)
 declare i64 @rt_memo_get(i64, ptr, i64, ptr)
 declare void @rt_memo_put(i64, i64)
 define internal { i64, i64 } @tstc0.string(ptr %env) {
