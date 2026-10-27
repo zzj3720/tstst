@@ -613,8 +613,9 @@ type Defaults<D extends Decl, F extends string, P extends string, I extends 0[]>
   : `  %dc${P}.${I["length"]} = call { i64, i64 } @"${D[0]}.d${I["length"]}"(ptr ${F})\n  %dv${P}.${I["length"]} = extractvalue { i64, i64 } %dc${P}.${I["length"]}, 0\n  %dp${P}.${I["length"]} = getelementptr inbounds i64, ptr ${F}, i64 ${I["length"]}\n  store i64 %dv${P}.${I["length"]}, ptr %dp${P}.${I["length"]}\n${Defaults<D, F, P, [...I, 0]>}`;
 
 // a function of the frame returning the value of X
-type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends string = "internal "> =
-  Gen<X, P, C> extends [infer A extends string, infer V extends string, infer D extends string]
+type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends string = "internal "> = FnOf<Name, Gen<X, P, C>, Linkage>;
+type FnOf<Name extends string, G, Linkage extends string = "internal "> =
+  G extends [infer A extends string, infer V extends string, infer D extends string]
     ? `${D}define ${Linkage}{ i64, i64 } @"${Name}"(ptr %env) {\nentry:\n${A}  %ret = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 ${V}, 0\n  ret { i64, i64 } %ret\n}\n`
     : never;
 
@@ -659,8 +660,8 @@ ${Branch<"f", FP, FV>}Lv:
 // a part of a descriptor: [definitions, its function or null, its constant
 // value or 0] (a part that reads nothing is its value, without a function)
 type Thunked<Name extends string, X, P extends string, C extends Ctx> =
-  Gen<X, P, C> extends [infer A extends string, infer V extends string, infer D extends string]
-    ? A extends "" ? [D, "null", V] : [Fn<Name, X, P, C>, `@"${Name}"`, "0"]
+  Gen<X, P, C> extends infer G extends [string, string, string]
+    ? G[0] extends "" ? [G[2], "null", G[1]] : [FnOf<Name, G>, `@"${Name}"`, "0"]
     : never;
 // a branch of a conditional's function: its function's value, or its constant
 type Branch<K extends string, Ptr extends string, V extends string> =
