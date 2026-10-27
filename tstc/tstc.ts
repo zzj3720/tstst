@@ -555,7 +555,7 @@ type DispatchFnRefs<Ps extends any[], C extends Ctx, P extends string> = { [K in
 // a call of the alias N: a frame at the top of the environment stack with its
 // arguments (and the defaults of those not given), then its function
 type GenCall<N0 extends string, As extends any[], P extends string, C extends Ctx> =
-  (Lookup<C[6], N0> & string) extends infer N extends string
+  (Lookup<C[6] & NoNames, N0> & string) extends infer N extends string
     ? [N] extends [never] ? ["", "18", ""] : GenCallG<N, As, P, C>
     : never;
 type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
@@ -666,7 +666,7 @@ type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends
 // Panic<M>) in it makes the alias H<M, S> instead, S the store's current
 // version (H's entry for the runtime's command line takes them)
 type Caught<D extends Decl, C extends Ctx> =
-  (D[5] extends keyof C[6] ? C[6][D[5]] & string : D[5]) extends infer H extends string
+  (Lookup<C[6] & NoNames, D[5]> & string) extends infer H extends string
     ? FindDecl<C[2], H> extends infer HD extends Decl
       ? `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
 entry:
@@ -694,15 +694,15 @@ type EffectSet<Ds extends Decl[], Names> = EffectStep<Ds, Names, Flat<EffSeed<Ds
 // one property access)
 type NoEff = { [k: string]: 0 | 1 };
 type EffSeed<Ds extends Decl[]> = { [I in keyof Ds as I extends `${number}` ? (IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never) : never]: 1 };
-type EffectStep<Ds extends Decl[], Names, E> =
+type EffectStep<Ds extends Decl[], Names, E extends NoEff> =
   EffNew<Ds, Names, E> extends infer N ? ([keyof N] extends [never] ? E : EffectStep<Ds, Names, Flat<E & N>>) : never;
 // the aliases not in E that call one in it
-type EffNew<Ds extends Decl[], Names, E> = { [I in keyof Ds as I extends `${number}` ? (
-    E[Ds[I][0] & keyof E] extends 1 ? never : true extends HasEff<Callees<Ds[I], Names>, E> ? Ds[I][0] : never) : never]: 1 };
-type HasEff<Cs, E> = Cs extends string ? (E[Cs & keyof E] extends 1 ? true : false) : false;
+type EffNew<Ds extends Decl[], Names, E extends NoEff> = { [I in keyof Ds as I extends `${number}` ? (
+    E[Ds[I][0]] extends 1 ? never : true extends HasEff<Callees<Ds[I], Names>, E> ? Ds[I][0] : never) : never]: 1 };
+type HasEff<Cs, E extends NoEff> = Cs extends string ? (E[Cs] extends 1 ? true : false) : false;
 // the aliases a declaration's body names, as its file resolves them
-type Callees<D, Names> = D extends Decl ? Resolve<RefNames<D[2]>, D[3] extends keyof Names ? Names[D[3]] : {}> : never;
-type Resolve<N, M> = N extends string ? Lookup<M, N> : never;
+type Callees<D, Names> = D extends Decl ? Resolve<RefNames<D[2]>, D[3] extends keyof Names ? Names[D[3]] & NoNames : NoNames> : never;
+type Resolve<N, M extends NoNames> = N extends string ? Lookup<M, N> : never;
 type RefNames<X> = X extends ["ref", infer N, infer As] ? N | RefNames<As> : X extends [infer H, ...infer R] ? RefNames<H> | RefNames<R> : never;
 
 // ---------------------------------------------------------------------------
@@ -975,7 +975,7 @@ type FileNames<In, P extends string> =
 // string, so a lookup is one property access, not a test against keyof of
 // every name)
 type NoNames = { [k: string]: string };
-type Lookup<M, N> = M[N & string & keyof M] extends infer V ? (V extends string ? (string extends V ? N : V) : N) : N;
+type Lookup<M extends NoNames, N> = M[N & string] extends infer V ? (V extends string ? (string extends V ? N : V) : N) : N;
 type NamedImports<In, P extends string, Is extends any[]> =
   { [I in keyof Is as I extends `${number}` ? (Is[I] extends ["named", infer L, any, any] ? L : never) : never]:
       Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<In, ResolvePath<P, Spec>, Im> : never };
