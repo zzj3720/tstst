@@ -427,7 +427,9 @@ type Child<P extends string, N extends string> =
 type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], ...S], C[2], C[3], C[4], C[5], C[6], C[7]];
 
 type Gen<X, P extends string, C extends Ctx> =
-  X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
+  // (a number: a static object of the runtime's layout, rt/tstc.h NumT)
+  X extends ["num", infer T extends string] ? ["", `ptrtoint (ptr @"nm.${C[0]}${P}" to i64)`,
+    `@"nm.${C[0]}${P}" = internal constant { i32, i32, double } { i32 17, i32 0, double ${T extends `${string}.${string}` ? T : `${T}.0`} }, align 8\n`]
   : X extends ["big", infer T extends string]
     ? Len<T> extends "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17" | "18"
       ? (T extends `-${string}` ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""] : ["", Inc<Dbl<T>>, ""])
