@@ -321,9 +321,10 @@ type Range<N extends number, Acc extends number[] = []> = Acc["length"] extends 
 type Plus<A extends number, B extends number> = [...Range<A>, ...Range<B>]["length"] & number;
 type IndexOf<X, L extends any[], I extends 0[] = []> =
   L extends [infer H, ...infer R] ? ([H] extends [X] ? I["length"] : IndexOf<X, R, [...I, 0]>) : -1;
-type Join<L extends string[], Sep extends string = ""> =
-  L extends [infer H extends string] ? H
-  : L extends [infer H extends string, ...infer R extends string[]] ? `${H}${Sep}${Join<R, Sep>}` : "";
+// (text is built front to back, each step appending to what it was given: a
+// step returning text it then prefixes leaves every suffix in the memo table)
+type Join<L extends string[], Sep extends string = "", Acc extends string = ""> =
+  L extends [infer H extends string, ...infer R extends string[]] ? Join<R, Sep, Acc extends "" ? H : `${Acc}${Sep}${H}`> : Acc;
 
 // UTF-16 code units of ASCII text, as an LLVM string constant's bytes
 type U16<S extends string, Acc extends string = ""> =
@@ -446,10 +447,10 @@ type GenArray<Xs extends any[], P extends string, C extends Ctx, Tag extends str
     ? [`${A}  %${Tag}${P} = alloca [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64]\n${StoreAll<Vs, `%${Tag}${P}`, `${Tag}${P}`>}`, D]
     : never;
 
-type StoreAll<Vs extends string[], Base extends string, Tag extends string, I extends 0[] = []> =
+type StoreAll<Vs extends string[], Base extends string, Tag extends string, I extends 0[] = [], Acc extends string = ""> =
   Vs extends [infer V extends string, ...infer R extends string[]]
-    ? `  %p${Tag}.${I["length"]} = getelementptr inbounds i64, ptr ${Base}, i64 ${I["length"]}\n  store i64 ${V}, ptr %p${Tag}.${I["length"]}\n${StoreAll<R, Base, Tag, [...I, 0]>}`
-    : "";
+    ? StoreAll<R, Base, Tag, [...I, 0], `${Acc}  %p${Tag}.${I["length"]} = getelementptr inbounds i64, ptr ${Base}, i64 ${I["length"]}\n  store i64 ${V}, ptr %p${Tag}.${I["length"]}\n`>
+    : Acc;
 
 type ElemKind = { req: "i64 0"; opt: "i64 1"; rest: "i64 2" };
 type GenTuple<Es extends any[], P extends string, C extends Ctx> =
@@ -504,9 +505,11 @@ type GenMapped<X, P extends string, C extends Ctx> =
 // a call of the alias N: a frame at the top of the environment stack with its
 // arguments (and the defaults of those not given), then its function
 type GenCall<N0 extends string, As extends any[], P extends string, C extends Ctx> =
-  (N0 extends keyof C[6] ? C[6][N0] & string : N0) extends infer N extends string ? GenCallG<N, As, P, C> : never;
+  (N0 extends keyof C[6] ? C[6][N0] & string : N0) extends infer N extends string
+    ? [N] extends [never] ? ["", "18", ""] : GenCallG<N, As, P, C>
+    : never;
 type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
-  FindDecl<C[2], N> extends infer D extends Decl
+  [FindDecl<C[2], N>] extends [infer D extends Decl]
     ? GenList<As, P, C> extends [infer A extends string, infer Vs extends string[], infer Ds extends string]
       ? [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${Frame<D>}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
          `%r${P}`, Ds]
@@ -585,14 +588,10 @@ ${PatName<C, P>} = internal constant ${PD} { i64 4, i64 0, ptr null, i64 0, i64 
 // copies are named apart, under the path's ".p")
 type PatCode<X, P extends string, C extends Ctx> =
   `${Fn<`${C[0]}$pv${P}`, X, `${P}.p`, C>}${PatName<C, P>} = internal constant ${PD} { i64 0, i64 0, ptr @"${C[0]}$pv${P}", i64 0, i64 0, ptr null, ptr null, ptr null, ptr null, ptr null, ptr null, i64 0 }\n`;
-type PatElems<Xs extends any[], P extends string, C extends Ctx, I extends 0[] = [], Imp extends string = "null"> =
-  Xs extends [infer A, ...infer R] ? `${Pat<A, `${P}.${I["length"]}`, C, Imp>}${PatElems<R, P, C, [...I, 0], Imp>}` : "";
-type PatTupleElems<Es extends any[], P extends string, C extends Ctx, I extends 0[] = []> =
-  Es extends [[infer K, infer A], ...infer R]
-    ? `${Pat<A, `${P}.${I["length"]}`, C>}${PatTupleElems<R, P, C, [...I, 0]>}` : "";
-type PatFnElems<Ps extends any[], P extends string, C extends Ctx, I extends 0[] = []> =
-  Ps extends [[string, infer A, infer Rest], ...infer R]
-    ? `${Pat<A, `${P}.${I["length"]}`, C>}${PatFnElems<R, P, C, [...I, 0]>}` : "";
+type PatElems<Xs extends any[], P extends string, C extends Ctx, I extends 0[] = [], Imp extends string = "null", Acc extends string = ""> =
+  Xs extends [infer A, ...infer R] ? PatElems<R, P, C, [...I, 0], Imp, `${Acc}${Pat<A, `${P}.${I["length"]}`, C, Imp>}`> : Acc;
+type PatTupleElems<Es extends any[], P extends string, C extends Ctx> = PatElems<{ [K in keyof Es]: Es[K][1] }, P, C>;
+type PatFnElems<Ps extends any[], P extends string, C extends Ctx> = PatElems<{ [K in keyof Ps]: Ps[K][1] }, P, C>;
 type PatArray<Xs extends any[], P extends string, C extends Ctx> =
   `@"pe${C[0]}${P}" = internal constant [${Xs["length"]} x ptr] [${Join<{ [K in keyof Xs]: `ptr ${PatName<C, `${P}.${K & string}`>}` }, ", ">}]\n`;
 
