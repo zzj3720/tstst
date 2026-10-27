@@ -326,8 +326,9 @@ type Slot<S extends [string, number][], N extends string> =
   : S extends [...infer R extends [string, number][], any] ? Slot<R, N> : -1;
 // the declarations by name: one object (a memoized alias's context holds it
 // as an object, hashed by identity, not as a tuple hashed through)
-type DeclMap<Ds, Acc = {}> =
-  Ds extends [infer D extends Decl, ...infer R] ? DeclMap<R, Acc & { [K in D[0]]: D }> : Flat<Acc>;
+// (objects made by one mapped type over the tuple's indices: a chain of
+// intersections looks every name up in every member)
+type DeclMap<Ds> = { [I in keyof Ds as I extends `${number}` ? (Ds[I] extends Decl ? Ds[I][0] : never) : never]: Ds[I] };
 type Flat<T> = { [K in keyof T]: T[K] };
 type FindDecl<M, N extends string> = N extends keyof M ? M[N] : false;
 type Frame<D extends Decl> = Plus<D[1]["length"], Binders<D[2], ".b">["length"]>;
@@ -715,24 +716,24 @@ type Exports<Files, P extends string> =
   FileOf<Files, P> extends [string, infer Ds extends Decl[], any, infer Rs extends any[]]
     ? Flat<LocalNames<Ds> & ReexportNames<Files, P, Rs>>
     : {};
-type LocalNames<Ds extends Decl[], Acc = {}> =
-  Ds extends [infer D extends Decl, ...infer R extends Decl[]]
-    ? LocalNames<R, Acc & { [K in (D[0] extends `${string}:${infer N}` ? N : D[0])]: D[0] }> : Acc;
-type ReexportNames<Files, P extends string, Rs extends any[], Acc = {}> =
-  Rs extends [[infer E extends string, infer I extends string, infer Spec extends string], ...infer R extends any[]]
-    ? ReexportNames<Files, P, R, Acc & { [K in E]: Exports<Files, ResolvePath<P, Spec>>[I & keyof Exports<Files, ResolvePath<P, Spec>>] }>
-    : Acc;
+type LocalNames<Ds extends Decl[]> =
+  { [I in keyof Ds as I extends `${number}` ? ShortName<Ds[I][0]> : never]: Ds[I][0] };
+type ShortName<N> = N extends `${string}:${infer S}` ? S : N;
+type ReexportNames<Files, P extends string, Rs extends any[]> =
+  { [I in keyof Rs as I extends `${number}` ? Rs[I][0] : never]: Exported<Files, ResolvePath<P, Rs[I][2]>, Rs[I][1]> };
+type Exported<Files, P extends string, N> = Exports<Files, P> extends infer E ? N extends keyof E ? E[N] : never : never;
 // the names a file sees: its own aliases, its imports, a namespace's members as `ns.name`
 type FileNames<Files, F extends [string, Decl[], any[], any[]]> =
-  Flat<LocalNames<F[1]> & ImportNames<Files, F[0], F[2]>>;
-type ImportNames<Files, P extends string, Is extends any[], Acc = {}> =
+  Flat<LocalNames<F[1]> & NamedImports<Files, F[0], F[2]> & NsImports<Files, F[0], F[2]>>;
+type NamedImports<Files, P extends string, Is extends any[]> =
+  { [I in keyof Is as I extends `${number}` ? (Is[I] extends ["named", infer L, any, any] ? L : never) : never]:
+      Is[I] extends ["named", any, infer Im, infer Spec extends string] ? Exported<Files, ResolvePath<P, Spec>, Im> : never };
+// (a namespace's members as `ns.name`: few namespaces, so an intersection)
+type NsImports<Files, P extends string, Is extends any[], Acc = {}> =
   Is extends [infer I, ...infer R extends any[]]
-    ? ImportNames<Files, P, R, Acc & (
-        I extends ["ns", infer NS extends string, infer Spec extends string]
-          ? Exports<Files, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never
-        : I extends ["named", infer L extends string, infer Im extends string, infer Spec extends string]
-          ? { [K in L]: Exports<Files, ResolvePath<P, Spec>>[Im & keyof Exports<Files, ResolvePath<P, Spec>>] }
-        : {})>
+    ? NsImports<Files, P, R, I extends ["ns", infer NS extends string, infer Spec extends string]
+        ? Acc & (Exports<Files, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never)
+        : Acc>
     : Acc;
 type NamesOf<Files> = Flat<NamesAcc<Files>>;
 type NamesAcc<Files, Acc = {}> =
