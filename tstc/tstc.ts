@@ -679,7 +679,7 @@ type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
   CtxOf<D, Ds, Names> extends infer C extends Ctx
     ? IsNative<D> extends true
       ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
-      : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends keyof Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
       : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Caught<D, C>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
 type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives ? true : false : false;
@@ -710,20 +710,16 @@ entry:
 // happen again (as the MoonBit tstc plans its memo). The least fixed point
 // of "calls one of them", from the natives.
 type EffectNatives = "hget" | "hset" | "hgetf" | "hsetf" | "hgets" | "hsets" | "halloc" | "hinit" | "hcopy" | "hloadt" | "hstoret" | "salloc" | "sappend" | "sappendv" | "scopy" | "sclear" | "sswap" | "bytes2s" | "ptrstr" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "bstr" | "bappend" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "clock_ms" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step";
-type EffectSet<Ds extends Decl[], Names extends FileTables> = EffectStep<Ds, Names, TableOf<[...EffSeed<Ds>, [string, 0 | 1]]>>;
-// (an effect set reads 1 for its names and 0 | 1 for the others: a test is
-// one property access)
-type NoEff = { [k: string]: 0 | 1 };
-type EffSeed<Ds extends Decl[]> = { [I in keyof Ds]: IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? [Ds[I][0], 1] : [never, never]) : [never, never] };
-// each step: the aliases in E or calling one in it, until none is new
-// ([name, 1, 1] in E, [name, 1, 2] new, [never, never, 0] neither)
-type EffectStep<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
-  EffMarks<Ds, Names, E> extends infer X extends any[]
-    ? (2 extends X[number][2] ? EffectStep<Ds, Names, TableOf<[...X, [string, 0 | 1]]>> : E)
-    : never;
-type EffMarks<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
-  { [I in keyof Ds]: E[Ds[I][0]] extends 1 ? [Ds[I][0], 1, 1] : true extends HasEff<Callees<Ds[I], Names>, E> ? [Ds[I][0], 1, 2] : [never, never, 0] };
-type HasEff<Cs, E extends NoEff> = Cs extends string ? (E[Cs] extends 1 ? true : false) : false;
+// (the effect set is a union: a big union finds a member by its hash)
+type EffectSet<Ds extends Decl[], Names extends FileTables> = EffReach<Callers<Ds, Names>, EffSeeds<Ds>, never>;
+type EffSeeds<Ds extends Decl[]> = { [I in keyof Ds]: IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never }[number];
+// who calls each alias: one pair per declaration, its callees to its name
+// (the pairs of a name merge into the union of its callers)
+type Callers<Ds extends Decl[], Names extends FileTables> = TableOf<[...{ [I in keyof Ds]: [Callees<Ds[I], Names>, Ds[I][0]] }, [string, never]]>;
+// from the natives up through the callers, each step the callers of the
+// last step's new aliases not yet seen: each edge followed once
+type EffReach<C extends NoNames, F, Seen> = [F] extends [never] ? Seen : EffReach<C, NotIn<C[F & string], Seen | F>, Seen | F>;
+type NotIn<X, S> = X extends S ? never : X;
 // the aliases a declaration's body names, as its file resolves them
 // (the file's table as it is: an intersection with another object would
 // make every lookup merge the members of both)
