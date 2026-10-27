@@ -491,13 +491,17 @@ type GenArray<Xs extends any[], P extends string, C extends Ctx, Tag extends str
       // (values that are constants: a constant array, nothing stored)
       ? [`  %${Tag}${P} = getelementptr inbounds i64, ptr @"${Tag}c.${C[0]}${P}", i64 0\n`,
          `${D}@"${Tag}c.${C[0]}${P}" = internal constant [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64] [${Vs extends [] ? "i64 0" : Join<ConstElems<Vs>, ", ">}]\n`]
-      : [`${A}  %${Tag}${P} = alloca [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64]\n${StoreAll<Vs, `%${Tag}${P}`, `${Tag}${P}`>}`, D]
+      // (some computed: the constant ones copied from a constant array, the
+      // others stored)
+      : [`${A}  %${Tag}${P} = alloca [${Xs["length"]} x i64]\n  call void @llvm.memcpy.p0.p0.i64(ptr %${Tag}${P}, ptr @"${Tag}c.${C[0]}${P}", i64 ${Dbl<Dbl<Dbl<`${Xs["length"]}`>>>}, i1 false)\n${StoreAll<Vs, `%${Tag}${P}`, `${Tag}${P}`, true>}`,
+         `${D}@"${Tag}c.${C[0]}${P}" = internal constant [${Xs["length"]} x i64] [${Join<ConstElems<Vs>, ", ">}]\n`]
     : never;
-type ConstElems<Vs extends string[]> = { [K in keyof Vs]: `i64 ${Vs[K]}` };
+type ConstElems<Vs extends string[]> = { [K in keyof Vs]: Vs[K] extends `%${string}` ? "i64 0" : `i64 ${Vs[K]}` };
 
-type StoreAll<Vs extends string[], Base extends string, Tag extends string, I extends 0[] = [], Acc extends string = ""> =
+// (Regs: only the computed values, the constants being there already)
+type StoreAll<Vs extends string[], Base extends string, Tag extends string, Regs extends boolean = false, I extends 0[] = [], Acc extends string = ""> =
   Vs extends [infer V extends string, ...infer R extends string[]]
-    ? StoreAll<R, Base, Tag, [...I, 0], `${Acc}  %p${Tag}.${I["length"]} = getelementptr inbounds i64, ptr ${Base}, i64 ${I["length"]}\n  store i64 ${V}, ptr %p${Tag}.${I["length"]}\n`>
+    ? StoreAll<R, Base, Tag, Regs, [...I, 0], Regs extends false ? `${Acc}  %p${Tag}.${I["length"]} = getelementptr inbounds i64, ptr ${Base}, i64 ${I["length"]}\n  store i64 ${V}, ptr %p${Tag}.${I["length"]}\n` : V extends `%${string}` ? `${Acc}  %p${Tag}.${I["length"]} = getelementptr inbounds i64, ptr ${Base}, i64 ${I["length"]}\n  store i64 ${V}, ptr %p${Tag}.${I["length"]}\n` : Acc>
     : Acc;
 
 type ElemKind = { req: "i64 0"; opt: "i64 1"; rest: "i64 2" };
@@ -1002,6 +1006,7 @@ declare i64 @rt_index(i64, i64)
 declare i64 @rt_keyof(i64)
 declare i64 @rt_empty_tuple()
 declare i64 @rt_tupled(ptr, ptr)
+declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)
 declare i64 @rt_tpl(ptr, ptr, i64)
 declare i64 @rt_fnty(ptr, ptr, i64)
 declare i64 @rt_obj(ptr, ptr)
