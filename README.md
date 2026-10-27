@@ -89,18 +89,24 @@ tstc/tstc build ../tstst/programs/tsc.ts -o tsc --rt tstc/rt -O 1
 
 `tstc/tstc.ts` compiles type-level programs for the runtime of
 [go2types](https://github.com/zzj3720/go2types)' tstc (`libtstcrt.a`): an
-alias becomes a function of its frame, memoized by its arguments;
-conditional types, `infer` patterns (in tuples, templates and function
-types), tuples, unions, intersections, template literal types, object and
-mapped types, `keyof`, indexed access and the intrinsic string types are
-made by the runtime. It reads the program's text (`Main<Source>`) and gives
-the IR, which clang links with the runtime.
+alias becomes a function of its frame, memoized by its arguments (unless it
+can reach a native with effects); conditional types, `infer` patterns (in
+tuples, templates, objects and function types), tuples, unions,
+intersections, template literal types, object and mapped types, `keyof`,
+indexed access and the intrinsic string types are made by the runtime. Its
+input is a program, or a pack of files (`\u0000path\u0000` before each text)
+with their imports, namespaces and re-exports; it gives the IR, which clang
+links with the runtime.
 
-Built once by the MoonBit tstc, it compiles the benchmark programs of
-go2types' `tstc/bench/tl` (Peano arithmetic, sorting, strings, a JSON
-parser, a stack machine, type challenges) to programs whose results are
-those of the MoonBit tstc, and it compiles itself to a fixed point
-(go2types' `tstc/scripts/typelevel.sh`).
+It compiles go2types' programs with `lib/pure` as the MoonBit tstc does:
+`lib/pure`'s `@native` definitions are the runtime's natives while its files
+are the checked versions (their hashes), go2types' dispatch tables are looked
+up by key, and `@catch` handlers recover Go's runtime errors. Built once by
+the MoonBit tstc, it compiles the programs of go2types' `tstc/bench/tl` and
+all of `tstst/go2types/tscdata` (hello, arithmetic, floats, branches,
+interfaces, loops, maps, strings, runtime errors) to programs whose output is
+the MoonBit tstc's, and it compiles itself to a fixed point (go2types'
+`tstc/scripts/typelevel.sh`).
 
 ## License
 
