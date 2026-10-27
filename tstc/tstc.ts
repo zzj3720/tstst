@@ -79,7 +79,8 @@ type T16 = [[[0, 0], [1, 0], [2, 0], [3, 0], [4, 0], [5, 0], [6, 0], [7, 0], [8,
 type LexStr<S extends string, Q extends string, T extends string, Acc extends Tok[], St extends (0 | 1)[]> =
   S extends `${infer C}${infer R}`
     ? C extends Q ? Lex<R, [...Acc, ["str", T]], St>
-    : C extends "\\" ? (R extends `u00${infer A}${infer B}${infer R2}` | `x${infer A}${infer B}${infer R2}` ? LexStr<R2, Q, `${T}${HexChar<A, B>}`, Acc, St>
+    : C extends "\\" ? (R extends `u00${infer A}${infer B}${infer R2}` ? LexStr<R2, Q, `${T}${HexChar<A, B>}`, Acc, St>
+      : R extends `x${infer A}${infer B}${infer R2}` ? LexStr<R2, Q, `${T}${HexChar<A, B>}`, Acc, St>
       : R extends `${infer E}${infer R2}` ? LexStr<R2, Q, `${T}${Unescape<E>}`, Acc, St> : Acc)
     : LexStr<R, Q, `${T}${C}`, Acc, St>
     : Acc;
@@ -89,7 +90,8 @@ type LexStr<S extends string, Q extends string, T extends string, Acc extends To
 type LexTpl<S extends string, T extends string, Acc extends Tok[], St extends (0 | 1)[], End extends string, Hole extends string> =
   S extends `\`${infer R}` ? Lex<R, [...Acc, [End, T]], St>
   : S extends `\${${infer R}` ? Lex<R, [...Acc, [Hole, T]], [...St, 1]>
-  : S extends `\\u00${infer A}${infer B}${infer R}` | `\\x${infer A}${infer B}${infer R}` ? LexTpl<R, `${T}${HexChar<A, B>}`, Acc, St, End, Hole>
+  : S extends `\\u00${infer A}${infer B}${infer R}` ? LexTpl<R, `${T}${HexChar<A, B>}`, Acc, St, End, Hole>
+  : S extends `\\x${infer A}${infer B}${infer R}` ? LexTpl<R, `${T}${HexChar<A, B>}`, Acc, St, End, Hole>
   : S extends `\\${infer E}${infer R}` ? LexTpl<R, `${T}${Unescape<E>}`, Acc, St, End, Hole>
   : S extends `${infer C}${infer R}` ? LexTpl<R, `${T}${C}`, Acc, St, End, Hole>
   : Acc;
