@@ -430,7 +430,7 @@ type Gen<X, P extends string, C extends Ctx> =
   X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
   : X extends ["big", infer T extends string]
     ? Len<T> extends "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "11" | "12" | "13" | "14" | "15" | "16" | "17" | "18"
-      ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""]
+      ? (T extends `-${string}` ? [`  %s${P} = shl i64 ${T}, 1\n  %r${P} = or i64 %s${P}, 1\n`, `%r${P}`, ""] : ["", Inc<Dbl<T>>, ""])
       : [`  %r${P} = call i64 @mk_bigint_text(ptr ${StrName<C, P>})\n`, `%r${P}`, StrDef<T, C, P>]
   : X extends ["str", infer T extends string] ? ["", StrRef<C, P>, StrDef<T, C, P>]
   : X extends ["kw", "boolean"] ? [`  %r${P} = call i64 @rt_union2(i64 90, i64 98)\n`, `%r${P}`, ""]
@@ -485,8 +485,13 @@ type GenList<Xs extends any[], P extends string, C extends Ctx, I extends 0[] = 
 // the values in an array of the frame's function
 type GenArray<Xs extends any[], P extends string, C extends Ctx, Tag extends string> =
   GenList<Xs, P, C> extends [infer A extends string, infer Vs extends string[], infer D extends string]
-    ? [`${A}  %${Tag}${P} = alloca [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64]\n${StoreAll<Vs, `%${Tag}${P}`, `${Tag}${P}`>}`, D]
+    ? A extends ""
+      // (values that are constants: a constant array, nothing stored)
+      ? [`  %${Tag}${P} = getelementptr inbounds i64, ptr @"${Tag}c.${C[0]}${P}", i64 0\n`,
+         `${D}@"${Tag}c.${C[0]}${P}" = internal constant [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64] [${Vs extends [] ? "i64 0" : Join<ConstElems<Vs>, ", ">}]\n`]
+      : [`${A}  %${Tag}${P} = alloca [${Xs["length"] extends 0 ? 1 : Xs["length"]} x i64]\n${StoreAll<Vs, `%${Tag}${P}`, `${Tag}${P}`>}`, D]
     : never;
+type ConstElems<Vs extends string[]> = { [K in keyof Vs]: `i64 ${Vs[K]}` };
 
 type StoreAll<Vs extends string[], Base extends string, Tag extends string, I extends 0[] = [], Acc extends string = ""> =
   Vs extends [infer V extends string, ...infer R extends string[]]
