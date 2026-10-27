@@ -611,14 +611,35 @@ type CtxOf<D extends Decl, Ds, Names> =
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
-type AliasIR<D extends Decl, Ds, Names, Id extends string> =
+type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff> =
   CtxOf<D, Ds, Names> extends infer C extends Ctx
-    ? D[4] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
-    : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives
-      ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
-      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
-      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+    ? IsNative<D> extends true
+      ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends keyof Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
+type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives ? true : false : false;
+// an alias not looked up in the memo table: its body
+type Plain<D extends Decl> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
+entry:
+  %c = musttail call { i64, i64 } @"${D[0]}$body"(ptr %env)
+  ret { i64, i64 } %c
+}
+`;
+// Aliases that can reach a native with effects (a store threaded through
+// them and updated in place, output, processes) are not memoized: a lookup
+// would hand back a store an earlier call went on with, and effects must
+// happen again (as the MoonBit tstc plans its memo). The least fixed point
+// of "calls one of them", from the natives.
+type EffectNatives = "hget" | "hset" | "hgetf" | "hsetf" | "hgets" | "hsets" | "halloc" | "hinit" | "hcopy" | "hloadt" | "hstoret" | "salloc" | "sappend" | "sappendv" | "scopy" | "sclear" | "sswap" | "bytes2s" | "ptrstr" | "s2bytes" | "runes2sl" | "s2runesl" | "srange" | "snext" | "bstr" | "bappend" | "write_out" | "fork" | "wait" | "exit" | "crash_note" | "clock_ms" | "cell_pmap_get" | "cell_pmap_put" | "cell_pmap_del" | "cell_pmap_len" | "cell_pmap_keys" | "cell_pmap_step";
+type EffectSet<Ds extends Decl[], Names> = EffectStep<Ds, Names, EffSeed<Ds>>;
+type EffSeed<Ds extends Decl[]> = { [I in keyof Ds as I extends `${number}` ? (IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? Ds[I][0] : never) : never) : never]: 1 };
+type EffectStep<Ds extends Decl[], Names, E> =
+  EffNext<Ds, Names, E> extends infer E2 ? (keyof E2 extends keyof E ? E : EffectStep<Ds, Names, E2>) : never;
+type EffNext<Ds extends Decl[], Names, E> = Flat<E & { [I in keyof Ds as I extends `${number}` ? ([Callees<Ds[I], Names> & keyof E] extends [never] ? never : Ds[I][0]) : never]: 1 }>;
+// the aliases a declaration's body names, as its file resolves them
+type Callees<D, Names> = D extends Decl ? Resolve<RefNames<D[2]>, D[3] extends keyof Names ? Names[D[3]] : {}> : never;
+type Resolve<N, M> = N extends keyof M ? M[N] : N;
+type RefNames<X> = X extends ["ref", infer N, infer As] ? N | RefNames<As> : X extends [infer H, ...infer R] ? RefNames<H> | RefNames<R> : never;
 
 // ---------------------------------------------------------------------------
 // Natives: an alias of tstst's lib/pure tagged `@native name` is the
@@ -827,7 +848,7 @@ define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
 }
 
-${DeclMap<Ds> extends infer M ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string> }> : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
+${DeclMap<Ds> extends infer M ? EffectSet<Ds, Names> extends infer Eff ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff> }> : never : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
 @tstc_entries = constant ptr @"tstc$entries"
 @tstc_nentries = constant i64 ${Ds["length"]}
 ${DumpList<Ds, MainFile> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
