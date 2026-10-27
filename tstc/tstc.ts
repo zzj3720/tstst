@@ -89,17 +89,43 @@ type LexTpl<S extends string, T extends string, Acc extends Tok[], St extends (0
 type Keyword = "any" | "unknown" | "never" | "string" | "number" | "bigint" | "symbol" | "object"
   | "null" | "undefined" | "void" | "true" | "false" | "boolean";
 
-type Decl = [string, [string, any][], any];
+// [global name, parameters, body, file]: a file's aliases are named
+// `file:name`, but for the lib's and the program's own (the first file)
+type Decl = [string, [string, any][], any, string];
 
-type ParseDecls<T, Acc extends Decl[] = []> =
-  T extends [["id", "export"], ...infer R] ? ParseDecls<R, Acc>
+// a file: [declarations, imports [["ns", name, spec] | ["named", local,
+// imported, spec]...], re-exports [[exported, imported, spec]...]]
+type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [], Is extends any[] = [], Rs extends any[] = []> =
+  T extends [["id", "import"], ...infer R]
+    ? (R extends [["id", "type"], ...infer R2] ? R2 : R) extends infer R3
+      ? R3 extends [["*", "*"], ["id", "as"], ["id", infer NS extends string], ["id", "from"], ["str", infer Spec extends string], ...infer R4]
+        ? ParseFile<SkipSemi<R4>, F, Pre, Acc, [...Is, ["ns", NS, Spec]], Rs>
+      : R3 extends [["{", "{"], ...infer R4]
+        ? ParseNames<R4> extends [infer Ns extends [string, string][], [["id", "from"], ["str", infer Spec extends string], ...infer R5]]
+          ? ParseFile<SkipSemi<R5>, F, Pre, Acc, [...Is, ...{ [K in keyof Ns]: ["named", Ns[K][1], Ns[K][0], Spec] }], Rs>
+          : [Acc, Is, Rs]
+        : [Acc, Is, Rs]
+      : never
+  : T extends [["id", "export"], ["id", "type"], ["{", "{"], ...infer R]
+    ? ParseNames<R> extends [infer Ns extends [string, string][], [["id", "from"], ["str", infer Spec extends string], ...infer R5]]
+      ? ParseFile<SkipSemi<R5>, F, Pre, Acc, Is, [...Rs, ...{ [K in keyof Ns]: [Ns[K][1], Ns[K][0], Spec] }]>
+      : [Acc, Is, Rs]
+  : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs>
   : T extends [["id", "type"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2]]
       ? ParseType<R2> extends [infer B, infer R3]
-        ? ParseDecls<R3 extends [[";", ";"], ...infer R4] ? R4 : R3, [...Acc, [N, Ps, B]]>
-        : Acc
-      : Acc
-  : Acc;
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F]], Is, Rs>
+        : [Acc, Is, Rs]
+      : [Acc, Is, Rs]
+  : [Acc, Is, Rs];
+type SkipSemi<T> = T extends [[";", ";"], ...infer R] ? R : T;
+// `a, b as c }`: [[imported, local]...]
+type ParseNames<T, Acc extends [string, string][] = []> =
+  T extends [["}", "}"], ...infer R] ? [Acc, R]
+  : T extends [[",", ","], ...infer R] ? ParseNames<R, Acc>
+  : T extends [["id", infer A extends string], ["id", "as"], ["id", infer B extends string], ...infer R] ? ParseNames<R, [...Acc, [A, B]]>
+  : T extends [["id", infer A extends string], ...infer R] ? ParseNames<R, [...Acc, [A, A]]>
+  : [Acc, T];
 
 type ParseParams<T> =
   T extends [["<", "<"], ...infer R] ? ParseParamList<R> : [[], T];
@@ -181,6 +207,8 @@ type ParsePrimary<T> =
       ? ParseOp<R2> extends [infer C, infer R3] ? [["infer", N, C], R3] : never
       : [["infer", N, null], R]
   : T extends [["id", infer K extends Keyword], ...infer R] ? [["kw", K], R]
+  : T extends [["id", infer NS extends string], [".", "."], ["id", infer N extends string], ...infer R]
+    ? (R extends [["<", "<"], ...infer R2] ? ParseArgs<R2> : [[], R]) extends [infer As, infer R3] ? [["ref", `${NS}.${N}`, As], R3] : never
   : T extends [["id", infer N extends string], ["<", "<"], ...infer R]
     ? ParseArgs<R> extends [infer As, infer R2] ? [["ref", N, As], R2] : never
   : T extends [["id", infer N extends string], ...infer R] ? [["ref", N, []], R]
@@ -285,7 +313,7 @@ type LLChar = { "\u0000": "\\00"; "\u0001": "\\01"; "\u0002": "\\02"; "\u0003": 
 // Gen<node, path, ctx> is [instructions, register, definitions]; names of
 // registers and globals are made of the node's path.
 
-type Ctx = [string, [string, number][], any, [string, string][], number, number];
+type Ctx = [string, [string, number][], any, [string, string][], number, number, any];
 type G = [string, string, string];
 
 type Kw = { any: 0; unknown: 1; never: 2; string: 3; number: 4; bigint: 5; symbol: 6; object: 7;
@@ -331,7 +359,7 @@ type Bind<C extends Ctx, P extends string, L extends [string, string][] = C[3]> 
   L extends [[infer Q extends string, infer N extends string], ...infer R extends [string, string][]]
     ? Q extends P | `${P}.${string}` ? [[N, BinderSlot<C, Q>], ...Bind<C, P, R>] : Bind<C, P, R>
     : [];
-type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], ...S], C[2], C[3], C[4], C[5]];
+type WithScope<C extends Ctx, S extends [string, number][]> = [C[0], [...C[1], ...S], C[2], C[3], C[4], C[5], C[6]];
 
 type Gen<X, P extends string, C extends Ctx> =
   X extends ["num", infer T extends string] ? [`  %r${P} = call i64 @mk_num(double ${T extends `${string}.${string}` ? T : `${T}.0`})\n`, `%r${P}`, ""]
@@ -446,7 +474,9 @@ type GenMapped<X, P extends string, C extends Ctx> =
 
 // a call of the alias N: a frame at the top of the environment stack with its
 // arguments (and the defaults of those not given), then its function
-type GenCall<N extends string, As extends any[], P extends string, C extends Ctx> =
+type GenCall<N0 extends string, As extends any[], P extends string, C extends Ctx> =
+  (N0 extends keyof C[6] ? C[6][N0] & string : N0) extends infer N extends string ? GenCallG<N, As, P, C> : never;
+type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
   FindDecl<C[2], N> extends infer D extends Decl
     ? GenList<As, P, C> extends [infer A extends string, infer Vs extends string[], infer Ds extends string]
       ? [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${Frame<D>}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
@@ -537,13 +567,13 @@ type PatArray<Xs extends any[], P extends string, C extends Ctx> =
 // An alias: its function (the body), one per default, and its entry for the
 // runtime's command line (arguments given, then the defaults)
 
-type CtxOf<D extends Decl, Ds> =
-  [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>];
+type CtxOf<D extends Decl, Ds, Names> =
+  [D[0], Params<D[1]>, Ds, Binders<D[2], ".b">, D[1]["length"], Frame<D>, D[3] extends keyof Names ? Names[D[3]] : {}];
 type Params<Ps extends [string, any][], I extends 0[] = []> =
   Ps extends [[infer N extends string, any], ...infer R extends [string, any][]] ? [[N, I["length"]], ...Params<R, [...I, 0]>] : [];
 
-type AliasIR<D extends Decl, Ds, Id extends string> =
-  CtxOf<D, Ds> extends infer C extends Ctx
+type AliasIR<D extends Decl, Ds, Names, Id extends string> =
+  CtxOf<D, Ds, Names> extends infer C extends Ctx
     ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
 // an alias looks its arguments up in the runtime's memo table (evaluation
@@ -617,7 +647,7 @@ type ReturnType<T> = T extends (...args: any) => infer R ? R : any;
 type NoInfer<T> = T;
 `;
 
-type Module<Ds extends Decl[]> = `; generated by tstc0
+type Module<Ds extends Decl[], Names, MainFile extends string> = `; generated by tstc0
 @tstc_top = external global ptr
 declare i64 @mk_num(double)
 declare i64 @rt_union2(i64, i64)
@@ -640,19 +670,76 @@ define internal { i64, i64 } @tstc0.string(ptr %env) {
   ret { i64, i64 } { i64 26, i64 0 }
 }
 
-${DeclMap<Ds> extends infer M ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, K & string> }> : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
+${DeclMap<Ds> extends infer M ? Join<{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string> }> : never}${Join<{ [K in keyof Ds]: `@"n.${Ds[K][0]}" = private constant [${Plus<Len<Ds[K][0]>, 1>} x i8] ${CStr<Ds[K][0]>}\n` }>}@"tstc$entries" = constant [${Ds["length"]} x { ptr, ptr, i64 }] [${Join<{ [K in keyof Ds]: `{ ptr, ptr, i64 } { ptr @"n.${Ds[K][0]}", ptr @"${Ds[K][0]}.w", i64 ${Ds[K][1]["length"]} }` }, ", ">}]
 @tstc_entries = constant ptr @"tstc$entries"
 @tstc_nentries = constant i64 ${Ds["length"]}
-${DumpList<Ds> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
+${DumpList<Ds, MainFile> extends infer L extends string[] ? `@"tstc$dump" = constant [${L["length"]} x i64] [${Join<L, ", ">}]
 @tstc_dump = constant ptr @"tstc$dump"
 @tstc_ndump = constant i64 ${L["length"]}` : never}
 @tstc_store = constant { i64, i64 } zeroinitializer
 @tstc_cov_names = constant ptr null
 @tstc_cov_n = constant i64 0
 `;
-type DumpList<Ds extends Decl[], I extends 0[] = []> =
+// (the aliases of the program's own file)
+type DumpList<Ds extends Decl[], F extends string, I extends 0[] = []> =
   Ds extends [infer D extends Decl, ...infer R extends Decl[]]
-    ? D[1] extends [] ? [`i64 ${I["length"]}`, ...DumpList<R, [...I, 0]>] : DumpList<R, [...I, 0]>
+    ? D[1] extends [] ? D[3] extends F ? [`i64 ${I["length"]}`, ...DumpList<R, F, [...I, 0]>] : DumpList<R, F, [...I, 0]> : DumpList<R, F, [...I, 0]>
     : [];
 
-type Main<Source extends string = ""> = Module<ParseDecls<Lex<`${Prelude}${Source}`>>>;
+// ---------------------------------------------------------------------------
+// Files: the input is one program, or a pack of files, each "\u0000path\u0000"
+// and its text (the program first). An import's path is relative to its
+// file's directory, without ".ts".
+
+type Unpack<S extends string> =
+  S extends `\u0000${infer P}\u0000${infer R}` ? (R extends `${infer T}\u0000${infer R2}` ? [[P, T], ...Unpack<`\u0000${R2}`>] : [[P, R]])
+  : [["main.ts", S]];
+type Segs<S extends string> = S extends `${infer A}/${infer B}` ? [A, ...Segs<B>] : [S];
+type NormSegs<L extends string[], Acc extends string[] = []> =
+  L extends [infer H extends string, ...infer R extends string[]]
+    ? H extends "." | "" ? NormSegs<R, Acc>
+    : H extends ".." ? (Acc extends [...infer P extends string[], string] ? NormSegs<R, P> : NormSegs<R, [...Acc, ".."]>)
+    : NormSegs<R, [...Acc, H]>
+    : Acc;
+type DirOf<F extends string> = Segs<F> extends [...infer D extends string[], string] ? Join<D, "/"> : "";
+type ResolvePath<F extends string, Spec extends string> = `${Join<NormSegs<Segs<`${DirOf<F>}/${Spec}`>>, "/">}.ts`;
+
+// the parsed files: [path, declarations, imports, re-exports]
+type ParseAll<Fs extends [string, string][], I extends 0[] = []> =
+  Fs extends [[infer P extends string, infer T extends string], ...infer R extends [string, string][]]
+    ? [[P, ...ParseFile<Lex<T>, P, I extends [] | [0] ? "" : `${P}:`>], ...ParseAll<R, [...I, 0]>]
+    : [];
+type FileOf<Files, P extends string> = Files extends [infer H extends [string, any, any, any], ...infer R] ? (H[0] extends P ? H : FileOf<R, P>) : never;
+// what a file exports: its aliases and what it re-exports, by name
+type Exports<Files, P extends string> =
+  FileOf<Files, P> extends [string, infer Ds extends Decl[], any, infer Rs extends any[]]
+    ? Flat<LocalNames<Ds> & ReexportNames<Files, P, Rs>>
+    : {};
+type LocalNames<Ds extends Decl[], Acc = {}> =
+  Ds extends [infer D extends Decl, ...infer R extends Decl[]]
+    ? LocalNames<R, Acc & { [K in (D[0] extends `${string}:${infer N}` ? N : D[0])]: D[0] }> : Acc;
+type ReexportNames<Files, P extends string, Rs extends any[], Acc = {}> =
+  Rs extends [[infer E extends string, infer I extends string, infer Spec extends string], ...infer R extends any[]]
+    ? ReexportNames<Files, P, R, Acc & { [K in E]: Exports<Files, ResolvePath<P, Spec>>[I & keyof Exports<Files, ResolvePath<P, Spec>>] }>
+    : Acc;
+// the names a file sees: its own aliases, its imports, a namespace's members as `ns.name`
+type FileNames<Files, F extends [string, Decl[], any[], any[]]> =
+  Flat<LocalNames<F[1]> & ImportNames<Files, F[0], F[2]>>;
+type ImportNames<Files, P extends string, Is extends any[], Acc = {}> =
+  Is extends [infer I, ...infer R extends any[]]
+    ? ImportNames<Files, P, R, Acc & (
+        I extends ["ns", infer NS extends string, infer Spec extends string]
+          ? Exports<Files, ResolvePath<P, Spec>> extends infer E ? { [K in keyof E as `${NS}.${K & string}`]: E[K] } : never
+        : I extends ["named", infer L extends string, infer Im extends string, infer Spec extends string]
+          ? { [K in L]: Exports<Files, ResolvePath<P, Spec>>[Im & keyof Exports<Files, ResolvePath<P, Spec>>] }
+        : {})>
+    : Acc;
+type NamesOf<Files> = Flat<NamesAcc<Files>>;
+type NamesAcc<Files, Acc = {}> =
+  Files extends [infer F extends [string, Decl[], any[], any[]], ...infer R] ? NamesAcc<R, Acc & { [K in F[0]]: FileNames<Files, F> }> : Acc;
+type AllDecls<Files> = Files extends [[string, infer Ds extends Decl[], any, any], ...infer R] ? [...Ds, ...AllDecls<R>] : [];
+
+type Main<Pack extends string = ""> =
+  ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
+    ? Module<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0]>
+    : never;
