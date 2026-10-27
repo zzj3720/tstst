@@ -1,1 +1,0 @@
-type A = [a: string?];

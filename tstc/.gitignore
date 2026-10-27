@@ -1,8 +1,0 @@
-target/
-.mooncakes/
-rt/build/
-rt/libtstcrt.a
-out/
-node_modules/
-/tstc
-rt.log

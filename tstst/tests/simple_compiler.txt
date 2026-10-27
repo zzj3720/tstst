@@ -1,4 +1,0 @@
-bom-utf16be.ts
-bom-utf16le.ts
-bom-utf8.ts
-enumUnicodeEscapeMemberName.ts
