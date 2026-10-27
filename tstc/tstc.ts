@@ -716,14 +716,13 @@ type EffectSet<Ds extends Decl[], Names extends FileTables> = EffectStep<Ds, Nam
 type NoEff = { [k: string]: 0 | 1 };
 type EffSeed<Ds extends Decl[]> = { [I in keyof Ds]: IsNative<Ds[I]> extends true ? (Ds[I][4] extends EffectNatives ? [Ds[I][0], 1] : [never, never]) : [never, never] };
 // each step: the aliases in E or calling one in it, until none is new
+// ([name, 1, 1] in E, [name, 1, 2] new, [never, never, 0] neither)
 type EffectStep<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
-  EffFlags<Ds, Names, E> extends infer F extends any[]
-    ? (2 extends F[number] ? EffectStep<Ds, Names, TableOf<[...EffPairs<Ds, F>, [string, 0 | 1]]>> : E)
+  EffMarks<Ds, Names, E> extends infer X extends any[]
+    ? (2 extends X[number][2] ? EffectStep<Ds, Names, TableOf<[...X, [string, 0 | 1]]>> : E)
     : never;
-// per alias: 1 in E, 2 calls one in E (new), 0 neither
-type EffFlags<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
-  { [I in keyof Ds]: E[Ds[I][0]] extends 1 ? 1 : true extends HasEff<Callees<Ds[I], Names>, E> ? 2 : 0 };
-type EffPairs<Ds extends Decl[], F extends any[]> = { [I in keyof Ds]: F[I & keyof F] extends 0 ? [never, never] : [Ds[I][0], 1] };
+type EffMarks<Ds extends Decl[], Names extends FileTables, E extends NoEff> =
+  { [I in keyof Ds]: E[Ds[I][0]] extends 1 ? [Ds[I][0], 1, 1] : true extends HasEff<Callees<Ds[I], Names>, E> ? [Ds[I][0], 1, 2] : [never, never, 0] };
 type HasEff<Cs, E extends NoEff> = Cs extends string ? (E[Cs] extends 1 ? true : false) : false;
 // the aliases a declaration's body names, as its file resolves them
 // (the file's table as it is: an intersection with another object would
