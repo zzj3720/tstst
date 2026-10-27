@@ -272,12 +272,13 @@ type ParseTuple<T, Acc extends any[] = []> =
     : never;
 
 // `(` starts a function type when `)` `=>`, `...`, or a name and `:`, `?`,
-// `,` or `)` follow
+// `,` or `)` follow (the rests are inferred, not related to any[]: relating
+// the token list to an array type checks every token)
 type IsFnParams<T> =
-  T extends [[")", ")"], ["=>", "=>"], ...any[]] ? true
-  : T extends [["...", "..."], ...any[]] ? true
-  : T extends [["id", string], [":" | "?" | "," | ")", string], ...any[]]
-    ? (T extends [any, [")", ")"], ...infer R] ? (R extends [["=>", "=>"], ...any[]] ? true : false) : true)
+  T extends [[")", ")"], ["=>", "=>"], ...infer _R1] ? true
+  : T extends [["...", "..."], ...infer _R2] ? true
+  : T extends [["id", string], [":" | "?" | "," | ")", string], ...infer _R3]
+    ? (T extends [any, [")", ")"], ...infer R] ? (R extends [["=>", "=>"], ...infer _R4] ? true : false) : true)
   : false;
 type ParseFn<T, Ps extends [string, any, boolean][] = []> =
   T extends [[")", ")"], ["=>", "=>"], ...infer R]
