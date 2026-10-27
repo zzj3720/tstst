@@ -741,7 +741,7 @@ type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends
 type Caught<D extends Decl, C extends Ctx> =
   (Lookup<C[6], D[5]> & string) extends infer H extends string
     ? FindDecl<C[2], H> extends infer HD extends Decl
-      ? `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
+      ? `define hidden { i64, i64 } @"${D[0]}"(ptr %env) {
 entry:
   %c = call { i64, i64 } @tstc_try(ptr @"${D[0]}$body", ptr @"${H}.w", i64 ${HD[1]["length"]}, ptr %env, i64 0, i64 0, i64 0, i64 0, i64 0)
   ret { i64, i64 } %c
@@ -750,7 +750,7 @@ entry:
       : Plain<D>
     : never;
 // an alias not looked up in the memo table: its body
-type Plain<D extends Decl> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
+type Plain<D extends Decl> = `define hidden { i64, i64 } @"${D[0]}"(ptr %env) {
 entry:
   %c = musttail call { i64, i64 } @"${D[0]}$body"(ptr %env)
   ret { i64, i64 } %c
@@ -866,7 +866,7 @@ type FilterLib<A extends [string, string][], Acc extends [string, string][] = []
     ? FilterLib<R, BaseName<H[0]> extends keyof LibHashes ? [...Acc, H] : Acc> : Acc;
 // an alias looks its arguments up in the runtime's memo table (evaluation
 // is pure), then evaluates its body
-type Memo<D extends Decl, Id extends string> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
+type Memo<D extends Decl, Id extends string> = `define hidden { i64, i64 } @"${D[0]}"(ptr %env) {
 entry:
   %key = alloca i64
   %m = call i64 @rt_memo_get(i64 ${Id}, ptr %env, i64 ${D[1]["length"]}, ptr %key)
@@ -886,9 +886,9 @@ M:
 type DefaultFns<D extends Decl, C extends Ctx, I extends 0[] = []> =
   I["length"] extends D[1]["length"] ? ""
   : D[1][I["length"]] extends [string, infer X]
-    ? `${Fn<`${D[0]}.d${I["length"]}`, X extends null ? ["kw", "unknown"] : X, `.d${I["length"]}`, C>}${DefaultFns<D, C, [...I, 0]>}`
+    ? `${Fn<`${D[0]}.d${I["length"]}`, X extends null ? ["kw", "unknown"] : X, `.d${I["length"]}`, C, "hidden ">}${DefaultFns<D, C, [...I, 0]>}`
     : "";
-type Wrapper<D extends Decl> = `define internal i64 @"${D[0]}.w"(ptr %args, i64 %n) {
+type Wrapper<D extends Decl> = `define hidden i64 @"${D[0]}.w"(ptr %args, i64 %n) {
 entry:
   %f = load ptr, ptr @tstc_top
   %top = getelementptr inbounds i64, ptr %f, i64 ${Frame<D>}
@@ -937,10 +937,34 @@ type NoInfer<T> = T;
 
 // the module: pieces the runtime writes one after the other (joined, the
 // text of gigabytes would be copied whole)
-type Module<Ds extends Decl[], Names extends FileTables, MainFile extends string, Srcs extends [string, string][], Eff> =
+type Module<Ds extends Decl[], Names extends FileTables, MainFile extends string, Srcs extends [string, string][], Eff, CT extends NoNames> =
   DeclMap<Ds> extends infer M ? FrameTable<Ds> extends infer FT
-    ? [ModuleHead, ...{ [K in keyof Ds]: AliasIR<Ds[K], M, Names, K & string, Eff, FT> }, ModuleTail<Ds, MainFile>]
+    ? Units<Chunks<Numbered<Ds>>, Ds, M, Names, MainFile, Eff, FT, CT>
     : never : never;
+// The module is made of units (LLVM modules clang compiles one by one), of
+// UnitSize declarations each, in their order: each its pieces, the runtime
+// writing them one after the other. An alias's own functions and constants
+// are internal to its unit; its function, default functions and entry are
+// hidden, declared in the units that call them.
+type UnitSize = 500;
+type Numbered<Ds extends Decl[]> = { [K in keyof Ds]: [Ds[K], K & string] };
+type Chunks<L extends [Decl, string][], Cur extends [Decl, string][] = [], Acc extends [Decl, string][][] = []> =
+  L extends [infer X extends [Decl, string], ...infer R extends [Decl, string][]]
+    ? (Cur["length"] extends UnitSize ? Chunks<R, [X], [...Acc, Cur]> : Chunks<R, [...Cur, X], Acc>)
+    : [...Acc, Cur];
+type Units<Us extends [Decl, string][][], Ds extends Decl[], M, Names extends FileTables, MainFile extends string, Eff, FT, CT extends NoNames> =
+  { [U in keyof Us]: Unit<Us[U], Ds, M, Names, Eff, FT, CT, U extends LastIndex<Us> ? ModuleTail<Ds, MainFile> : ""> };
+type LastIndex<L extends any[]> = L extends [any, ...infer R] ? `${R["length"]}` : never;
+type Unit<G extends [Decl, string][], Ds extends Decl[], M, Names extends FileTables, Eff, FT, CT extends NoNames, Tail extends string> =
+  { [K in keyof G]: G[K][0][0] }[number] extends infer Own
+    ? [ModuleHead, ...{ [K in keyof G]: AliasIR<G[K][0], M, Names, G[K][1], Eff, FT> },
+       Externs<Ds, NotIn<{ [K in keyof G]: CT[G[K][0][0]] | Handler<G[K][0], Names> }[number] | (Tail extends "" ? never : Ds[number][0]), Own>>, Tail]
+    : never;
+// declarations of the aliases a unit calls that other units define
+type Externs<Ds extends Decl[], Ext> = Join<{ [K in keyof Ds]: Ds[K][0] extends Ext ? Extern<Ds[K]> : "" }>;
+type Extern<D extends Decl> =
+  `declare hidden { i64, i64 } @"${D[0]}"(ptr)\ndeclare hidden i64 @"${D[0]}.w"(ptr, i64)\n${Join<DefaultExterns<D[0], D[1]>>}`;
+type DefaultExterns<N extends string, Ps extends any[]> = { [I in keyof Ps]: `declare hidden { i64, i64 } @"${N}.d${I & string}"(ptr)\n` };
 type ModuleHead = `; generated by tstc0
 declare i64 @rt_tuple1(i64)
 declare i64 @rt_tuple2(i64, i64)
@@ -1075,7 +1099,7 @@ type Main<Pack extends string = ""> =
   ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
     ? (LibOk<LibSrcs<Unpack<Pack>>> extends true ? AllDecls<Files> : NoNatives<AllDecls<Files>>) extends infer Ds extends Decl[]
       ? CalleeTable<Ds, NamesOf<Files>> extends infer CT extends NoNames
-        ? Module<Reachable<Ds, NamesOf<Files>, CT, Unpack<Pack>[0][0]>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>, EffectSet<Ds, CT>>
+        ? Module<Reachable<Ds, NamesOf<Files>, CT, Unpack<Pack>[0][0]>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>, EffectSet<Ds, CT>, CT>
         : never
       : never
     : never;
