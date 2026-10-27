@@ -31,7 +31,8 @@ type Lex<S extends string, Acc extends Tok[] = [], St extends (0 | 1)[] = []> =
   S extends `${infer C}${infer R}`
     ? C extends Space ? Lex<R, Acc, St>
     : S extends `//${string}\n${infer R2}` ? Lex<R2, Acc, St>
-    : S extends `/*${string}*/${infer R2}` ? Lex<R2, Acc, St>
+    : S extends `/*${infer Body}*/${infer R2}`
+      ? Body extends `${string}@native ${infer N}` ? Lex<R2, [...Acc, ["native", NativeName<N>]], St> : Lex<R2, Acc, St>
     : C extends Alpha ? LexWord<R, C, Acc, St>
     : S extends `0x${infer R2}` ? LexHex<R2, "", Acc, St>
     : C extends Digit ? LexNum<R, C, Acc, St>
@@ -47,6 +48,8 @@ type Lex<S extends string, Acc extends Tok[] = [], St extends (0 | 1)[] = []> =
     : Lex<R, [...Acc, [C, C]], St>
     : Acc;
 
+type NativeName<S extends string, W extends string = ""> =
+  S extends `${infer C}${infer R}` ? (C extends Lower | Digit | "_" ? NativeName<R, `${W}${C}`> : W) : W;
 type LexWord<S extends string, W extends string, Acc extends Tok[], St extends (0 | 1)[]> =
   S extends `${infer C}${infer R}`
     ? C extends AlNum ? LexWord<R, `${W}${C}`, Acc, St> : Lex<S, [...Acc, ["id", W]], St>
@@ -109,14 +112,16 @@ type LexTpl<S extends string, T extends string, Acc extends Tok[], St extends (0
 type Keyword = "any" | "unknown" | "never" | "string" | "number" | "bigint" | "symbol" | "object"
   | "null" | "undefined" | "void" | "true" | "false" | "boolean";
 
-// [global name, parameters, body, file]: a file's aliases are named
+// [global name, parameters, body, file, native (a doc comment's `@native
+// name`, or "")]: a file's aliases are named
 // `file:name`, but for the lib's and the program's own (the first file)
-type Decl = [string, [string, any][], any, string];
+type Decl = [string, [string, any][], any, string, string];
 
 // a file: [declarations, imports [["ns", name, spec] | ["named", local,
 // imported, spec]...], re-exports [[exported, imported, spec]...]]
-type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [], Is extends any[] = [], Rs extends any[] = []> =
-  T extends [["id", "import"], ...infer R]
+type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [], Is extends any[] = [], Rs extends any[] = [], Nat extends string = ""> =
+  T extends [["native", infer X extends string], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, X>
+  : T extends [["id", "import"], ...infer R]
     ? (R extends [["id", "type"], ...infer R2] ? R2 : R) extends infer R3
       ? R3 extends [["*", "*"], ["id", "as"], ["id", infer NS extends string], ["id", "from"], ["str", infer Spec extends string], ...infer R4]
         ? ParseFile<SkipSemi<R4>, F, Pre, Acc, [...Is, ["ns", NS, Spec]], Rs>
@@ -130,17 +135,17 @@ type ParseFile<T, F extends string, Pre extends string, Acc extends Decl[] = [],
     ? ParseNames<R> extends [infer Ns extends [string, string][], [["id", "from"], ["str", infer Spec extends string], ...infer R5]]
       ? ParseFile<SkipSemi<R5>, F, Pre, Acc, Is, [...Rs, ...{ [K in keyof Ns]: [Ns[K][1], Ns[K][0], Spec] }]>
       : [Acc, Is, Rs]
-  : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs>
+  : T extends [["id", "export"], ...infer R] ? ParseFile<R, F, Pre, Acc, Is, Rs, Nat>
   : T extends [["id", "interface"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["{", "{"], ...infer R2]]
       ? ParseObj<R2> extends [infer B, infer R3]
-        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F]], Is, Rs>
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat]], Is, Rs>
         : [Acc, Is, Rs]
       : [Acc, Is, Rs]
   : T extends [["id", "type"], ["id", infer N extends string], ...infer R]
     ? ParseParams<R> extends [infer Ps extends [string, any][], [["=", "="], ...infer R2]]
       ? ParseType<R2> extends [infer B, infer R3]
-        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F]], Is, Rs>
+        ? ParseFile<SkipSemi<R3>, F, Pre, [...Acc, [`${Pre}${N}`, Ps, B, F, Nat]], Is, Rs>
         : [Acc, Is, Rs]
       : [Acc, Is, Rs]
   : [Acc, Is, Rs];
@@ -608,8 +613,78 @@ type Params<Ps extends [string, any][], I extends 0[] = []> =
 
 type AliasIR<D extends Decl, Ds, Names, Id extends string> =
   CtxOf<D, Ds, Names> extends infer C extends Ctx
-    ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+    ? D[4] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+    : BaseName<D[3]> extends keyof LibHashes
+      ? `${Fn<`${D[0]}$def`, D[2], ".b", C>}${NativeBody<D>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
+
+// ---------------------------------------------------------------------------
+// Natives: an alias of tstst's lib/pure tagged `@native name` is the
+// runtime's n_name, while the lib's files in the program are the versions
+// the natives were checked against (their FNV-1a hashes, as the MoonBit tstc
+// checks them); otherwise its definition.
+
+type LibHashes = {
+  "float.ts": "5712411105102384201"; "go.ts": "5160468277790861014"; "gort.ts": "2680261447692585256";
+  "heap.ts": "940415589675261843"; "int.ts": "-6424677977165027"; "map.ts": "-653147424055246936";
+  "misc.ts": "-17566272838564479"; "rterr.ts": "5335410618643360334"; "softfloat.ts": "-2618646305736984855";
+  "str.ts": "541375017417051346"; "tables.ts": "-1180400605690907689" };
+// natives returning two results (the runtime's VPair)
+type PairNatives = "halloc" | "salloc" | "sappend" | "sappendv" | "scopy" | "s2bytes" | "s2runesl" | "ta2" | "srange"
+  | "decoderune" | "shash128" | "clock_ms" | "pmap_get" | "cell_pmap_get";
+type BaseName<P extends string> = P extends `${string}/${infer R}` ? BaseName<R> : P;
+type NativeBody<D extends Decl> =
+  `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<{ [K in keyof D[1]]: "i64" }, ", ">})
+define internal { i64, i64 } @"${D[0]}$body"(ptr %env) {
+entry:
+  %ok = call i1 @tstc0.libok()
+  br i1 %ok, label %N, label %D
+N:
+${Join<{ [K in keyof D[1]]: `  %g${K & string} = getelementptr inbounds i64, ptr %env, i64 ${K & string}\n  %a${K & string} = load i64, ptr %g${K & string}\n` }>}${D[4] extends PairNatives
+  ? `  %p = call { i64, i64 } @n_${D[4]}(${Join<{ [K in keyof D[1]]: `i64 %a${K & string}` }, ", ">})
+  %p0 = extractvalue { i64, i64 } %p, 0
+  %p1 = extractvalue { i64, i64 } %p, 1
+  %v = call i64 @tstc0.box(i64 %p0, i64 %p1)`
+  : `  %v = call i64 @n_${D[4]}(${Join<{ [K in keyof D[1]]: `i64 %a${K & string}` }, ", ">})`}
+  %r = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 %v, 0
+  ret { i64, i64 } %r
+D:
+  %d = musttail call { i64, i64 } @"${D[0]}$def"(ptr %env)
+  ret { i64, i64 } %d
+}
+`;
+// whether the lib's files in the program are the checked versions: their
+// texts (bytes) hashed once, at the first native call
+type LibCheck<Srcs extends [string, string][]> =
+  LibSrcs<Srcs> extends infer L extends [string, string][] ? `${Join<{ [K in keyof L]: `@"src.${K & string}" = private constant [${Len<L[K][1]>} x i8] c"${U8<L[K][1]>}"\n` }>}@tstc0.libst = internal global i8 0
+define internal i1 @tstc0.libok() {
+entry:
+  %st = load i8, ptr @tstc0.libst
+  %known = icmp ne i8 %st, 0
+  br i1 %known, label %K, label %C
+K:
+  %okk = icmp eq i8 %st, 1
+  ret i1 %okk
+C:
+${Join<{ [K in keyof L]: `  %h${K & string} = call i64 @tstc0.fnv(ptr @"src.${K & string}", i64 ${Len<L[K][1]>})\n  %e${K & string} = icmp eq i64 %h${K & string}, ${BaseName<L[K][0]> extends keyof LibHashes ? LibHashes[BaseName<L[K][0]>] : "0"}\n` }>}${AndChain<{ [K in keyof L]: `%e${K & string}` }>}
+  %stv = select i1 %all, i8 1, i8 2
+  store i8 %stv, ptr @tstc0.libst
+  ret i1 %all
+}
+` : never;
+type AndChain<Es extends string[], I extends 0[] = [], Prev extends string = "1"> =
+  Es extends [infer E extends string, ...infer R extends string[]]
+    ? `  %and${I["length"]} = and i1 ${Prev}, ${E}\n${AndChain<R, [...I, 0], `%and${I["length"]}`>}`
+    : `  %all = and i1 ${Prev}, 1\n`;
+type LibSrcs<Srcs extends [string, string][]> =
+  { [K in keyof Srcs]: Srcs[K] } extends infer A extends [string, string][] ? FilterLib<A> : never;
+type FilterLib<A extends [string, string][], Acc extends [string, string][] = []> =
+  A extends [infer H extends [string, string], ...infer R extends [string, string][]]
+    ? FilterLib<R, BaseName<H[0]> extends keyof LibHashes ? [...Acc, H] : Acc> : Acc;
+// a file's bytes (its code units below 256) in an LLVM string constant
+type U8<S extends string, Acc extends string = ""> =
+  S extends `${infer C}${infer R}` ? U8<R, `${Acc}${C extends keyof LLChar ? LLChar[C] : "?"}`> : Acc;
 // an alias looks its arguments up in the runtime's memo table (evaluation
 // is pure), then evaluates its body
 type Memo<D extends Decl, Id extends string> = `define internal { i64, i64 } @"${D[0]}"(ptr %env) {
@@ -681,7 +756,45 @@ type ReturnType<T> = T extends (...args: any) => infer R ? R : any;
 type NoInfer<T> = T;
 `;
 
-type Module<Ds extends Decl[], Names, MainFile extends string> = `; generated by tstc0
+type Module<Ds extends Decl[], Names, MainFile extends string, Srcs extends [string, string][]> = `; generated by tstc0
+declare i64 @rt_tuple1(i64)
+declare i64 @rt_tuple2(i64, i64)
+define internal i64 @tstc0.box(i64 %a, i64 %b) {
+entry:
+  %z = icmp eq i64 %b, 0
+  br i1 %z, label %A, label %P
+A:
+  ret i64 %a
+P:
+  %one = icmp eq i64 %b, 4
+  br i1 %one, label %O, label %T
+O:
+  %t1 = call i64 @rt_tuple1(i64 %a)
+  ret i64 %t1
+T:
+  %t2 = call i64 @rt_tuple2(i64 %a, i64 %b)
+  ret i64 %t2
+}
+define internal i64 @tstc0.fnv(ptr %p, i64 %n) {
+entry:
+  br label %L
+L:
+  %i = phi i64 [ 0, %entry ], [ %i2, %B ]
+  %h = phi i64 [ -3750763034362895579, %entry ], [ %h2, %B ]
+  %c = icmp ult i64 %i, %n
+  br i1 %c, label %B, label %E
+B:
+  %q = getelementptr inbounds i8, ptr %p, i64 %i
+  %b = load i8, ptr %q
+  %bz = zext i8 %b to i64
+  %x = xor i64 %h, %bz
+  %h2 = mul i64 %x, 1099511628211
+  %i2 = add i64 %i, 1
+  br label %L
+E:
+  ret i64 %h
+}
+${LibCheck<Srcs>}
 @tstc_top = external global ptr
 declare i64 @mk_num(double)
 declare i64 @mk_bigint_text(ptr)
@@ -777,5 +890,5 @@ type AllDecls<Files> = Files extends [[string, infer Ds extends Decl[], any, any
 
 type Main<Pack extends string = ""> =
   ParseAll<[["<lib>", Prelude], ...Unpack<Pack>]> extends infer Files
-    ? Module<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0]>
+    ? Module<AllDecls<Files>, NamesOf<Files>, Unpack<Pack>[0][0], Unpack<Pack>>
     : never;
