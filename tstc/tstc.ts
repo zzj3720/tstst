@@ -679,7 +679,23 @@ type Defaults<D extends Decl, F extends string, P extends string, I extends 0[]>
 // (a function whose value is a pair [A, B] returns its parts, as the runtime's
 // VPair: callers make the tuple only where they need it, tstc0.box)
 type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends string = "internal "> =
-  X extends ["tuple", [["req", infer A], ["req", infer B]]] ? FnPair<Name, A, B, P, C, Linkage> : FnOf<Name, Gen<X, P, C>, Linkage>;
+  X extends ["tuple", [["req", infer A], ["req", infer B]]] ? FnPair<Name, A, B, P, C, Linkage>
+  // (a conditional: its own function, jumped to; not called and returned
+  // from, which made a chain of conditionals in their branches a chain of
+  // frames as long)
+  : TailCond<X, P, C> extends [infer X2, infer P2 extends string]
+    ? `${CondFns<X2, P2, C>}define ${Linkage}{ i64, i64 } @"${Name}"(ptr %env) {\nentry:\n  %c = musttail call { i64, i64 } @"${C[0]}$c${P2}"(ptr %env)\n  ret { i64, i64 } %c\n}\n`
+  : FnOf<Name, Gen<X, P, C>, Linkage>;
+// a node Gen makes the call of a conditional's function: [the conditional,
+// its path] (an rtok conditional taken as its true branch), else false
+type TailCond<X, P extends string, C extends Ctx> =
+  X extends ["cond", ["obj", any[]], ["infer", infer T extends string, null],
+      ["cond", any, ["infer", string, ["keyof", ["ref", T, []]]], ["idx", ["ref", T, []], any], any], ["kw", "never"]]
+    ? false
+  : X extends ["cond", ["ref", infer N extends string, [any]], ["kw", "true"], infer T, any]
+    ? (IsRtok<N, C> extends true ? TailCond<T, Child<P, "2">, C> : [X, P])
+  : X extends ["cond", any, any, any, any] ? [X, P]
+  : false;
 type FnPair<Name extends string, A, B, P extends string, C extends Ctx, Linkage extends string> =
   GenList<[A, B], P, C> extends [infer Code extends string, [infer VA extends string, infer VB extends string], infer D extends string]
     ? `${D}define ${Linkage}{ i64, i64 } @"${Name}"(ptr %env) {\nentry:\n${Code}  %ret0 = insertvalue { i64, i64 } { i64 poison, i64 poison }, i64 ${VA}, 0\n  %ret = insertvalue { i64, i64 } %ret0, i64 ${VB}, 1\n  ret { i64, i64 } %ret\n}\n`
@@ -757,20 +773,26 @@ type PairFuse<X, P extends string, C extends Ctx, CA extends string, CV extends 
     ? (Xn extends RefNames<T2> ? CA
       : FusableBranch<T2, C> extends false ? CA
       : CA extends `${infer Pre}  ${CV} = call i64 @tstc0.box(i64 ${infer PA}, i64 ${infer PB})\n`
-        ? `${Pre}  %pq0 = icmp ne i64 ${PB}, 0\n  %pq4 = icmp ne i64 ${PB}, 4\n  %pq = and i1 %pq0, %pq4\n  br i1 %pq, label %Lpp, label %Lpx\nLpp:\n  %pga = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "0">>}\n  store i64 ${PA}, ptr %pga\n  %pgb = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "1">>}\n  store i64 ${PB}, ptr %pgb\n  %pt = musttail call { i64, i64 } @"${C[0]}$t${Child<P, "2">}"(ptr %env)\n  ret { i64, i64 } %pt\nLpx:\n  ${CV} = call i64 @tstc0.box(i64 ${PA}, i64 ${PB})\n`
+        ? `${Pre}  %pq0 = icmp ne i64 ${PB}, 0\n  %pq4 = icmp ne i64 ${PB}, 4\n  %pq = and i1 %pq0, %pq4\n  br i1 %pq, label %Lpp, label %Lpx\nLpp:\n  %pga = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "0">>}\n  store i64 ${PA}, ptr %pga\n  %pgb = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "1">>}\n  store i64 ${PB}, ptr %pgb\n  %pt = musttail call { i64, i64 } @"${PairTarget<T2, P, C>}"(ptr %env)\n  ret { i64, i64 } %pt\nLpx:\n  ${CV} = call i64 @tstc0.box(i64 ${PA}, i64 ${PB})\n`
         : CA)
     : CA;
 // (a branch made a function of its own: code to run, not a constant)
 type FusableBranch<T, C extends Ctx> =
   T extends ["tuple", [any, ...any[]]] ? true
   : T extends ["ref", string, [any, ...any[]]] ? true
-  : T extends ["cond", ["ref", infer N extends string, [any]], ["kw", "true"], any, any] ? (IsRtok<N, C> extends true ? false : true)
+  : T extends ["cond", ["ref", infer N extends string, [any]], ["kw", "true"], infer T2, any] ? (IsRtok<N, C> extends true ? (TailCond<T2, "", C> extends false ? false : true) : true)
   : T extends ["cond", any, any, any, any] ? true
   : false;
+// the function of the inner true branch T2 (the inner conditional at P.2):
+// its conditional's, or its own
+type PairTarget<T2, P extends string, C extends Ctx> =
+  TailCond<T2, Child<Child<P, "2">, "2">, C> extends [any, infer P2 extends string] ? `${C[0]}$c${P2}` : `${C[0]}$t${Child<P, "2">}`;
 // a part of a descriptor: [definitions, its function or null, its constant
 // value or 0] (a part that reads nothing is its value, without a function)
 type Thunked<Name extends string, X, P extends string, C extends Ctx> =
   X extends ["tuple", [["req", any], ["req", any]]] ? [Fn<Name, X, P, C>, `@"${Name}"`, "0"]
+  // (a conditional: its own function is the part's)
+  : TailCond<X, P, C> extends [infer X2, infer P2 extends string] ? [CondFns<X2, P2, C>, `@"${C[0]}$c${P2}"`, "0"]
   : Gen<X, P, C> extends infer G extends [string, string, string]
     ? G[0] extends "" ? [G[2], "null", G[1]] : [FnOf<Name, G>, `@"${Name}"`, "0"]
     : never;
