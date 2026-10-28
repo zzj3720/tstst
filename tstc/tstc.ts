@@ -744,7 +744,7 @@ type AliasIR<D extends Decl, Ds, Names, Id extends string, Eff, FT> =
   CtxOf<D, Ds, Names, Id, FT> extends infer C extends Ctx
     ? IsNative<D> extends true
       ? `${NativeBody<D>}${Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
-      : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${D[0] extends Eff ? Plain<D> : Memo<D, Id>}${DefaultFns<D, C>}${Wrapper<D>}`
+      : D[5] extends "" ? `${Fn<`${D[0]}$body`, D[2], ".b", C>}${[Eff] extends [never] ? Memo<D, Id> : Plain<D>}${DefaultFns<D, C>}${Wrapper<D>}`
       : `${Fn<`${D[0]}$body`, D[2], ".b", C>}${Caught<D, C>}${DefaultFns<D, C>}${Wrapper<D>}`
     : never;
 type IsNative<D extends Decl> = D[4] extends "" ? false : BaseName<D[3]> extends keyof LibHashes ? D[4] extends LibNatives ? true : false : false;
@@ -769,6 +769,9 @@ entry:
   ret { i64, i64 } %c
 }
 `;
+// A program that threads a store (some alias reaches a native with effects)
+// memoizes nothing, as the MoonBit tstc plans it: lookups cost and do not
+// hit. Otherwise every alias is memoized.
 // Aliases that can reach a native with effects (a store threaded through
 // them and updated in place, output, processes) are not memoized: a lookup
 // would hand back a store an earlier call went on with, and effects must
