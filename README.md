@@ -16,8 +16,9 @@ computes for them. Nothing here is anything but TypeScript.
   checker evaluates it the same way.
 
 - [`tstc/tstc.ts`](tstc/tstc.ts) is a compiler of type-level TypeScript to
-  LLVM IR, itself type-level TypeScript (about 650 lines). It compiles
-  itself: the compiler made from its own IR gives the same IR again.
+  LLVM IR, itself type-level TypeScript (about 1100 lines). It compiles
+  itself: the compiler made from its own IR gives the same IR again. It
+  compiles `programs/tsc.ts` too, to a `tsc` that prints what tsgo prints.
 
 A program's entry is `Main<Input>`: give it the input (for `tsc.ts`, the
 project's files and arguments) and the type it evaluates to is the output.
@@ -95,18 +96,24 @@ tuples, templates, objects and function types), tuples, unions,
 intersections, template literal types, object and mapped types, `keyof`,
 indexed access and the intrinsic string types are made by the runtime. Its
 input is a program, or a pack of files (`\u0000path\u0000` before each text)
-with their imports, namespaces and re-exports; it gives the IR, which clang
-links with the runtime.
+with their imports, namespaces and re-exports; it gives the IR as units of
+500 declarations (LLVM modules, each the tuple of its pieces), which clang
+compiles side by side and links with the runtime. Only what the program's
+own file reaches is compiled.
 
 It compiles go2types' programs with `lib/pure` as the MoonBit tstc does:
 `lib/pure`'s `@native` definitions are the runtime's natives while its files
-are the checked versions (their hashes), go2types' dispatch tables are looked
+are the checked versions (their FNV-1a hashes, computed in types when it
+compiles), go2types' dispatch tables are looked
 up by key, and `@catch` handlers recover Go's runtime errors. Built once by
 the MoonBit tstc, it compiles the programs of go2types' `tstc/bench/tl` and
 all of `tstst/go2types/tscdata` (hello, arithmetic, floats, branches,
 interfaces, loops, maps, strings, runtime errors) to programs whose output is
 the MoonBit tstc's, and it compiles itself to a fixed point (go2types'
-`tstc/scripts/typelevel.sh`).
+`tstc/scripts/typelevel.sh`). Built so, it compiles `programs/tsc.ts` (52 MB)
+in about 20 minutes and 18 GB into 67 units (2.3 GB of IR), which clang
+compiles in about 7 minutes; that `tsc`'s output on a project is tsgo's,
+byte for byte.
 
 ## License
 

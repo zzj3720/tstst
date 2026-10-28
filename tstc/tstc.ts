@@ -1,5 +1,7 @@
 // tstc, written in type-level TypeScript: Main<Source> is the LLVM IR of the
-// type-level program Source, for tstc's runtime (libtstcrt.a): every alias a
+// type-level program Source (units: LLVM modules, each a tuple of pieces
+// the runtime writes one after the other), for tstc's runtime
+// (libtstcrt.a): every alias a
 // function of its frame (memoized by its arguments), conditionals decided by
 // the runtime (rt_cond, with the infer patterns of their extends types), the
 // other types made by the runtime's constructors.
