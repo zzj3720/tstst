@@ -452,6 +452,10 @@ type Gen<X, P extends string, C extends Ctx> =
   : X extends ["cond", ["obj", infer Ps extends any[]], ["infer", infer T extends string, null],
       ["cond", infer K, ["infer", infer N extends string, ["keyof", ["ref", T, []]]], ["idx", ["ref", T, []], ["ref", N, []]], infer D], ["kw", "never"]]
     ? GenDispatch<Ps, K, D, P, C>
+  // (`rtok<X> extends true ? T : F`: the native rtok is true, a failing
+  // operation not returning; with the natives on, T)
+  : X extends ["cond", ["ref", infer N extends string, [any]], ["kw", "true"], infer T, any]
+    ? (IsRtok<N, C> extends true ? Gen<T, Child<P, "2">, C> : GenCond<X, P, C>)
   : X extends ["cond", any, any, any, any] ? GenCond<X, P, C>
   : X extends ["infer", any, any] ? (BinderSlot<C, P> extends infer K extends number ? (K extends -1 ? ["", "18", ""] : GenLoad<K, P>) : never)
   : X extends ["ref", infer N extends keyof Intrinsic, [infer A]]
@@ -461,6 +465,10 @@ type Gen<X, P extends string, C extends Ctx> =
   : X extends ["ref", infer N extends string, infer As extends any[]] ? GenCall<N, As, P, C>
   : ["", "18", ""];  // (not supported yet: never)
 
+type IsRtok<N extends string, C extends Ctx> =
+  Slot<C[1], N> extends -1
+    ? ([FindDecl<C[2], Lookup<C[6], N> & string>] extends [infer D extends Decl] ? (D[4] extends "rtok" ? IsNative<D> : false) : false)
+    : false;
 type GenLoad<K extends number, P extends string> =
   [`  %g${P} = getelementptr inbounds i64, ptr %env, i64 ${K}\n  %r${P} = load i64, ptr %g${P}\n`, `%r${P}`, ""];
 type Op1<A extends G, P extends string, F extends string, Extra extends string, Pre extends string = ""> =
