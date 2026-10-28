@@ -517,13 +517,18 @@ type StoreAll<Vs extends string[], Base extends string, Tag extends string, Regs
 type ElemKind = { req: "i64 0"; opt: "i64 1"; rest: "i64 2" };
 type GenTuple<Es extends any[], P extends string, C extends Ctx> =
   Es extends [] ? [`  %r${P} = call i64 @rt_empty_tuple()\n`, `%r${P}`, ""]
-  // (required elements only: made as they are, no descriptor)
+  // (required elements only: made as they are, no descriptor; all of them
+  // constants: a static tuple of the runtime's layout, rt/tstc.h TupT)
   : AllReq<Es> extends true
-    ? (Es["length"] extends 1 | 2
+    ? (GenList<{ [K in keyof Es]: Es[K][1] }, P, C> extends [infer A0 extends string, infer Vs0 extends string[], infer D0 extends string]
+      ? A0 extends "" ? ["", `ptrtoint (ptr @"tu.${C[0]}${P}" to i64)`,
+          `${D0}@"tue.${C[0]}${P}" = internal constant [${Es["length"]} x i64] [${Join<ConstElems<Vs0>, ", ">}]\n@"tu.${C[0]}${P}" = internal constant { i32, i32, ptr, ptr } { i32 20, i32 ${Es["length"]}, ptr @"tue.${C[0]}${P}", ptr null }, align 8\n`]
+      : Es["length"] extends 1 | 2
       ? GenList<{ [K in keyof Es]: Es[K][1] }, P, C> extends [infer A extends string, infer Vs extends string[], infer D extends string]
         ? [`${A}  %r${P} = call i64 @rt_tuple${Es["length"]}(${Join<ArgVals<Vs>, ", ">})\n`, `%r${P}`, D] : never
       : GenArray<{ [K in keyof Es]: Es[K][1] }, P, C, "v"> extends [infer A extends string, infer D extends string]
-        ? [`${A}  %r${P} = call i64 @rt_tuplen(ptr %v${P}, i64 ${Es["length"]})\n`, `%r${P}`, D] : never)
+        ? [`${A}  %r${P} = call i64 @rt_tuplen(ptr %v${P}, i64 ${Es["length"]})\n`, `%r${P}`, D] : never
+      : never)
   : GenArray<{ [K in keyof Es]: Es[K][1] }, P, C, "v"> extends [infer A extends string, infer D extends string]
     ? [`${A}  %r${P} = call i64 @rt_tupled(ptr @"t.${C[0]}${P}", ptr %v${P})\n`,
        `%r${P}`,
