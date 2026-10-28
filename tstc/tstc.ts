@@ -747,17 +747,17 @@ type TupleInfers<Es extends any[]> = Es extends [] ? false : { [K in keyof Es]: 
 type TupleBinds<Es extends any[], EP extends string, C extends Ctx> = { [K in keyof Es]:
   `  %fa${K & string} = getelementptr inbounds i64, ptr %fe, i64 ${K & string}\n  %fv${K & string} = load i64, ptr %fa${K & string}\n  %fg${K & string} = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<EP, K & string>>}\n  store i64 %fv${K & string}, ptr %fg${K & string}\n` };
 // `F<..> extends infer X ? (X extends [infer A, infer B] ? T : E) : ..`, F an
-// alias returning a pair, T not reading X (go2types' calls returning the
+// alias, a native or a conditional giving a pair, T not reading X (go2types' calls returning the
 // store and a value): the call's parts bound to A and B and T called when
 // they are a pair, without making the tuple; otherwise the tuple made and
 // the conditional decided as written
 type PairFuse<X, P extends string, C extends Ctx, CA extends string, CV extends string> =
-  X extends ["cond", ["ref", string, [any, ...any[]]], ["infer", infer Xn extends string, null],
+  X extends ["cond", any, ["infer", infer Xn extends string, null],
       ["cond", ["ref", Xn, []], ["tuple", [["req", ["infer", string, null]], ["req", ["infer", string, null]]]], infer T2, any], any]
     ? (Xn extends RefNames<T2> ? CA
       : FusableBranch<T2, C> extends false ? CA
-      : CA extends `${infer Pre}  ${CV} = call i64 @tstc0.box(i64 ${CV}.pa, i64 ${CV}.pb)\n`
-        ? `${Pre}  %pq0 = icmp ne i64 ${CV}.pb, 0\n  %pq4 = icmp ne i64 ${CV}.pb, 4\n  %pq = and i1 %pq0, %pq4\n  br i1 %pq, label %Lpp, label %Lpx\nLpp:\n  %pga = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "0">>}\n  store i64 ${CV}.pa, ptr %pga\n  %pgb = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "1">>}\n  store i64 ${CV}.pb, ptr %pgb\n  %pt = musttail call { i64, i64 } @"${C[0]}$t${Child<P, "2">}"(ptr %env)\n  ret { i64, i64 } %pt\nLpx:\n  ${CV} = call i64 @tstc0.box(i64 ${CV}.pa, i64 ${CV}.pb)\n`
+      : CA extends `${infer Pre}  ${CV} = call i64 @tstc0.box(i64 ${infer PA}, i64 ${infer PB})\n`
+        ? `${Pre}  %pq0 = icmp ne i64 ${PB}, 0\n  %pq4 = icmp ne i64 ${PB}, 4\n  %pq = and i1 %pq0, %pq4\n  br i1 %pq, label %Lpp, label %Lpx\nLpp:\n  %pga = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "0">>}\n  store i64 ${PA}, ptr %pga\n  %pgb = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "1">>}\n  store i64 ${PB}, ptr %pgb\n  %pt = musttail call { i64, i64 } @"${C[0]}$t${Child<P, "2">}"(ptr %env)\n  ret { i64, i64 } %pt\nLpx:\n  ${CV} = call i64 @tstc0.box(i64 ${PA}, i64 ${PB})\n`
         : CA)
     : CA;
 // (a branch made a function of its own: code to run, not a constant)
