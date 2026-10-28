@@ -611,7 +611,9 @@ Lp${P}:
   %fp${P} = getelementptr inbounds [${Ps["length"]} x ptr], ptr @"dt.${C[0]}${P}", i64 0, i64 %i${P}
   %f${P} = load ptr, ptr %fp${P}
   %c${P} = call { i64, i64 } %f${P}(ptr %env)
-  %vp${P} = extractvalue { i64, i64 } %c${P}, 0
+  %vp${P}.pa = extractvalue { i64, i64 } %c${P}, 0
+  %vp${P}.pb = extractvalue { i64, i64 } %c${P}, 1
+  %vp${P} = call i64 @tstc0.box(i64 %vp${P}.pa, i64 %vp${P}.pb)
   br label %Lj${P}
 Ld${P}:
 ${DA}  br label %Le${P}
@@ -666,15 +668,22 @@ type NativeCall0<D extends Decl, Vs extends string[], P extends string> =
     ? `  %np${P} = call { i64, i64 } @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n  %na${P} = extractvalue { i64, i64 } %np${P}, 0\n  %nb${P} = extractvalue { i64, i64 } %np${P}, 1\n  %r${P} = call i64 @tstc0.box(i64 %na${P}, i64 %nb${P})\n`
     : `  %r${P} = call i64 @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n`;
 type GenCallF<N extends string, D extends Decl, A extends string, Vs extends string[], Ds extends string, P extends string, C extends Ctx> =
-      [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${C[7][D[0]] & number}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
+      [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${C[7][D[0]] & number}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P}.pa = extractvalue { i64, i64 } %c${P}, 0\n  %r${P}.pb = extractvalue { i64, i64 } %c${P}, 1\n  %r${P} = call i64 @tstc0.box(i64 %r${P}.pa, i64 %r${P}.pb)\n`,
          `%r${P}`, Ds];
 
 type Defaults<D extends Decl, F extends string, P extends string, I extends 0[]> =
   I["length"] extends D[1]["length"] ? ""
-  : `  %dc${P}.${I["length"]} = call { i64, i64 } @"${D[0]}.d${I["length"]}"(ptr ${F})\n  %dv${P}.${I["length"]} = extractvalue { i64, i64 } %dc${P}.${I["length"]}, 0\n  %dp${P}.${I["length"]} = getelementptr inbounds i64, ptr ${F}, i64 ${I["length"]}\n  store i64 %dv${P}.${I["length"]}, ptr %dp${P}.${I["length"]}\n${Defaults<D, F, P, [...I, 0]>}`;
+  : `  %dc${P}.${I["length"]} = call { i64, i64 } @"${D[0]}.d${I["length"]}"(ptr ${F})\n  %dv${P}.${I["length"]}.pa = extractvalue { i64, i64 } %dc${P}.${I["length"]}, 0\n  %dv${P}.${I["length"]}.pb = extractvalue { i64, i64 } %dc${P}.${I["length"]}, 1\n  %dv${P}.${I["length"]} = call i64 @tstc0.box(i64 %dv${P}.${I["length"]}.pa, i64 %dv${P}.${I["length"]}.pb)\n  %dp${P}.${I["length"]} = getelementptr inbounds i64, ptr ${F}, i64 ${I["length"]}\n  store i64 %dv${P}.${I["length"]}, ptr %dp${P}.${I["length"]}\n${Defaults<D, F, P, [...I, 0]>}`;
 
 // a function of the frame returning the value of X
-type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends string = "internal "> = FnOf<Name, Gen<X, P, C>, Linkage>;
+// (a function whose value is a pair [A, B] returns its parts, as the runtime's
+// VPair: callers make the tuple only where they need it, tstc0.box)
+type Fn<Name extends string, X, P extends string, C extends Ctx, Linkage extends string = "internal "> =
+  X extends ["tuple", [["req", infer A], ["req", infer B]]] ? FnPair<Name, A, B, P, C, Linkage> : FnOf<Name, Gen<X, P, C>, Linkage>;
+type FnPair<Name extends string, A, B, P extends string, C extends Ctx, Linkage extends string> =
+  GenList<[A, B], P, C> extends [infer Code extends string, [infer VA extends string, infer VB extends string], infer D extends string]
+    ? `${D}define ${Linkage}{ i64, i64 } @"${Name}"(ptr %env) {\nentry:\n${Code}  %ret0 = insertvalue { i64, i64 } { i64 poison, i64 poison }, i64 ${VA}, 0\n  %ret = insertvalue { i64, i64 } %ret0, i64 ${VB}, 1\n  ret { i64, i64 } %ret\n}\n`
+    : never;
 type FnOf<Name extends string, G, Linkage extends string = "internal "> =
   G extends [infer A extends string, infer V extends string, infer D extends string]
     ? `${D}define ${Linkage}{ i64, i64 } @"${Name}"(ptr %env) {\nentry:\n${A}  %ret = insertvalue { i64, i64 } { i64 poison, i64 0 }, i64 ${V}, 0\n  ret { i64, i64 } %ret\n}\n`
@@ -683,7 +692,7 @@ type FnOf<Name extends string, G, Linkage extends string = "internal "> =
 // a conditional is a function of its own (the runtime calls it again for each
 // member of a union it distributes over), called where it is
 type GenCond<X, P extends string, C extends Ctx> =
-  [`  %k${P} = call { i64, i64 } @"${C[0]}$c${P}"(ptr %env)\n  %r${P} = extractvalue { i64, i64 } %k${P}, 0\n`, `%r${P}`, CondFns<X, P, C>];
+  [`  %k${P} = call { i64, i64 } @"${C[0]}$c${P}"(ptr %env)\n  %r${P}.pa = extractvalue { i64, i64 } %k${P}, 0\n  %r${P}.pb = extractvalue { i64, i64 } %k${P}, 1\n  %r${P} = call i64 @tstc0.box(i64 %r${P}.pa, i64 %r${P}.pb)\n`, `%r${P}`, CondFns<X, P, C>];
 
 // (definitions come first in what they are joined into, the deepest first:
 // text appended to a string that ends its buffer is appended in place, the
@@ -703,7 +712,7 @@ type CondFns<X, P extends string, C extends Ctx> =
 define internal { i64, i64 } @"${C[0]}$c${P}"(ptr %env) {
 entry:
   %out = alloca i64
-${CA}${CondFast<E, Is, Child<P, "1">, C, CV>}  %d = call i64 @rt_cond(ptr @"${C[0]}$d${P}", i64 ${CV}, ptr %env, ptr %out)
+${PairFuse<X, P, C, CA, CV>}${CondFast<E, Is, Child<P, "1">, C, CV>}  %d = call i64 @rt_cond(ptr @"${C[0]}$d${P}", i64 ${CV}, ptr %env, ptr %out)
   switch i64 %d, label %Lv [ i64 0, label %Lt i64 1, label %Lf ]
 Lt:
 ${Branch<"t", TP, TV>}Lf:
@@ -737,10 +746,32 @@ type CondFast<E, Is extends [string, string][], EP extends string, C extends Ctx
 type TupleInfers<Es extends any[]> = Es extends [] ? false : { [K in keyof Es]: Es[K] extends ["req", ["infer", string, null]] ? true : false }[number] extends true ? true : false;
 type TupleBinds<Es extends any[], EP extends string, C extends Ctx> = { [K in keyof Es]:
   `  %fa${K & string} = getelementptr inbounds i64, ptr %fe, i64 ${K & string}\n  %fv${K & string} = load i64, ptr %fa${K & string}\n  %fg${K & string} = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<EP, K & string>>}\n  store i64 %fv${K & string}, ptr %fg${K & string}\n` };
+// `F<..> extends infer X ? (X extends [infer A, infer B] ? T : E) : ..`, F an
+// alias returning a pair, T not reading X (go2types' calls returning the
+// store and a value): the call's parts bound to A and B and T called when
+// they are a pair, without making the tuple; otherwise the tuple made and
+// the conditional decided as written
+type PairFuse<X, P extends string, C extends Ctx, CA extends string, CV extends string> =
+  X extends ["cond", ["ref", string, [any, ...any[]]], ["infer", infer Xn extends string, null],
+      ["cond", ["ref", Xn, []], ["tuple", [["req", ["infer", string, null]], ["req", ["infer", string, null]]]], infer T2, any], any]
+    ? (Xn extends RefNames<T2> ? CA
+      : FusableBranch<T2, C> extends false ? CA
+      : CA extends `${infer Pre}  ${CV} = call i64 @tstc0.box(i64 ${CV}.pa, i64 ${CV}.pb)\n`
+        ? `${Pre}  %pq0 = icmp ne i64 ${CV}.pb, 0\n  %pq4 = icmp ne i64 ${CV}.pb, 4\n  %pq = and i1 %pq0, %pq4\n  br i1 %pq, label %Lpp, label %Lpx\nLpp:\n  %pga = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "0">>}\n  store i64 ${CV}.pa, ptr %pga\n  %pgb = getelementptr inbounds i64, ptr %env, i64 ${BinderSlot<C, Child<Child<Child<P, "2">, "1">, "1">>}\n  store i64 ${CV}.pb, ptr %pgb\n  %pt = musttail call { i64, i64 } @"${C[0]}$t${Child<P, "2">}"(ptr %env)\n  ret { i64, i64 } %pt\nLpx:\n  ${CV} = call i64 @tstc0.box(i64 ${CV}.pa, i64 ${CV}.pb)\n`
+        : CA)
+    : CA;
+// (a branch made a function of its own: code to run, not a constant)
+type FusableBranch<T, C extends Ctx> =
+  T extends ["tuple", [any, ...any[]]] ? true
+  : T extends ["ref", string, [any, ...any[]]] ? true
+  : T extends ["cond", ["ref", infer N extends string, [any]], ["kw", "true"], any, any] ? (IsRtok<N, C> extends true ? false : true)
+  : T extends ["cond", any, any, any, any] ? true
+  : false;
 // a part of a descriptor: [definitions, its function or null, its constant
 // value or 0] (a part that reads nothing is its value, without a function)
 type Thunked<Name extends string, X, P extends string, C extends Ctx> =
-  Gen<X, P, C> extends infer G extends [string, string, string]
+  X extends ["tuple", [["req", any], ["req", any]]] ? [Fn<Name, X, P, C>, `@"${Name}"`, "0"]
+  : Gen<X, P, C> extends infer G extends [string, string, string]
     ? G[0] extends "" ? [G[2], "null", G[1]] : [FnOf<Name, G>, `@"${Name}"`, "0"]
     : never;
 // a branch of a conditional's function: its function's value, or its constant
@@ -956,7 +987,9 @@ H:
   ret { i64, i64 } %rh
 M:
   %c = call { i64, i64 } @"${D[0]}$body"(ptr %env)
-  %v = extractvalue { i64, i64 } %c, 0
+  %v.pa = extractvalue { i64, i64 } %c, 0
+  %v.pb = extractvalue { i64, i64 } %c, 1
+  %v = call i64 @tstc0.box(i64 %v.pa, i64 %v.pb)
   %k = load i64, ptr %key
   call void @rt_memo_put(i64 %k, i64 %v)
   ret { i64, i64 } %c
@@ -974,7 +1007,9 @@ entry:
   store ptr %top, ptr @tstc_top
 ${WrapArgs<D>}  %c = call { i64, i64 } @"${D[0]}"(ptr %f)
   store ptr %f, ptr @tstc_top
-  %r = extractvalue { i64, i64 } %c, 0
+  %r.pa = extractvalue { i64, i64 } %c, 0
+  %r.pb = extractvalue { i64, i64 } %c, 1
+  %r = call i64 @tstc0.box(i64 %r.pa, i64 %r.pb)
   ret i64 %r
 }
 `;
@@ -988,7 +1023,9 @@ G${I["length"]}:
   br label %S${I["length"]}
 D${I["length"]}:
   %dc${I["length"]} = call { i64, i64 } @"${D[0]}.d${I["length"]}"(ptr %f)
-  %dv${I["length"]} = extractvalue { i64, i64 } %dc${I["length"]}, 0
+  %dv${I["length"]}.pa = extractvalue { i64, i64 } %dc${I["length"]}, 0
+  %dv${I["length"]}.pb = extractvalue { i64, i64 } %dc${I["length"]}, 1
+  %dv${I["length"]} = call i64 @tstc0.box(i64 %dv${I["length"]}.pa, i64 %dv${I["length"]}.pb)
   br label %S${I["length"]}
 S${I["length"]}:
   %x${I["length"]} = phi i64 [ %av${I["length"]}, %G${I["length"]} ], [ %dv${I["length"]}, %D${I["length"]} ]
