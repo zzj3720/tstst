@@ -645,6 +645,23 @@ type GenCallG<N extends string, As extends any[], P extends string, C extends Ct
       : never
     : ["", "18", ""];
 type NativeCall<D extends Decl, Vs extends string[], P extends string> =
+  D[4] extends keyof IntFast ? (Vs extends [infer A extends string, infer B extends string] ? IntCall<D[4], A, B, P> : NativeCall0<D, Vs, P>)
+  : NativeCall0<D, Vs, P>;
+// integer operations on two immediates (2x + 1, bit 0 set) where they are,
+// the native for the rest (rt/prim.c): comparisons keep the order of the
+// encoding; and, or keep the encoding; add and sub check for overflow
+type IntFast = { ieq: ["icmp eq", "c"]; ine: ["icmp ne", "c"]; ilt: ["icmp slt", "c"]; ile: ["icmp sle", "c"]; igt: ["icmp sgt", "c"]; ige: ["icmp sge", "c"];
+  iand: ["and", "v"]; ior: ["or", "v"]; iadd: ["sadd", "o"]; isub: ["ssub", "o"]; geq: ["icmp eq", "g"]; gne: ["icmp ne", "g"] };
+type IntCall<N extends keyof IntFast, A extends string, B extends string, P extends string> =
+  `  %ia${P} = and i64 ${A}, ${B}\n  %ib${P} = and i64 %ia${P}, 1\n  %ic${P} = icmp ne i64 %ib${P}, 0\n  br i1 %ic${P}, label %Lif${P}, label %Lis${P}\nLif${P}:\n${IntOp<IntFast[N], A, B, P>}Lis${P}:\n  %sv${P} = call i64 @n_${N}(i64 ${A}, i64 ${B})\n  br label %Lij${P}\nLij${P}:\n  %r${P} = phi i64 [ %fv${P}, %Lio${P} ], [ %sv${P}, %Lis${P} ]\n`;
+type IntOp<O extends [string, string], A extends string, B extends string, P extends string> =
+  O[1] extends "c" ? `  %fc${P} = ${O[0]} i64 ${A}, ${B}\n  %fv${P} = select i1 %fc${P}, i64 90, i64 98\n  br label %Lio${P}\nLio${P}:\n  br label %Lij${P}\n`
+  : O[1] extends "v" ? `  %fv${P} = ${O[0]} i64 ${A}, ${B}\n  br label %Lio${P}\nLio${P}:\n  br label %Lij${P}\n`
+  // (geq/gne: two immediate integers are equal only if the same)
+  : O[1] extends "g" ? `  %fc${P} = ${O[0]} i64 ${A}, ${B}\n  %fv${P} = select i1 %fc${P}, i64 90, i64 98\n  br label %Lio${P}\nLio${P}:\n  br label %Lij${P}\n`
+  // (x + y: 2x+1 + 2y+1 - 1; x - y: 2x+1 - (2y+1) + 1; on overflow the native)
+  : `  %fb${P} = ${O[0] extends "sadd" ? `sub i64 ${B}, 1` : `sub i64 ${B}, 1`}\n  %fo${P} = call { i64, i1 } @llvm.${O[0]}.with.overflow.i64(i64 ${A}, i64 %fb${P})\n  %fv${P} = extractvalue { i64, i1 } %fo${P}, 0\n  %ff${P} = extractvalue { i64, i1 } %fo${P}, 1\n  br i1 %ff${P}, label %Lis${P}, label %Lio${P}\nLio${P}:\n  br label %Lij${P}\n`;
+type NativeCall0<D extends Decl, Vs extends string[], P extends string> =
   D[4] extends PairNatives
     ? `  %np${P} = call { i64, i64 } @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n  %na${P} = extractvalue { i64, i64 } %np${P}, 0\n  %nb${P} = extractvalue { i64, i64 } %np${P}, 1\n  %r${P} = call i64 @tstc0.box(i64 %na${P}, i64 %nb${P})\n`
     : `  %r${P} = call i64 @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n`;
@@ -1032,6 +1049,8 @@ declare i64 @rt_tuple1(i64)
 declare i64 @rt_tuple2(i64, i64)
 declare ptr @rt_tuple_elems(i64, i64)
 declare i64 @rt_tuplen(ptr, i64)
+declare { i64, i1 } @llvm.sadd.with.overflow.i64(i64, i64)
+declare { i64, i1 } @llvm.ssub.with.overflow.i64(i64, i64)
 ; a value conditionals decide where they are (CondFast): no union (23),
 ; intersection (24), unique symbol or marker (26), deferred type (28) or
 ; substitution (35); no any (2) or never (18)
