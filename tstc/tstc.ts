@@ -631,10 +631,18 @@ type GenCall<N0 extends string, As extends any[], P extends string, C extends Ct
 type GenCallG<N extends string, As extends any[], P extends string, C extends Ctx> =
   [FindDecl<C[2], N>] extends [infer D extends Decl]
     ? GenList<As, P, C> extends [infer A extends string, infer Vs extends string[], infer Ds extends string]
-      ? [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${C[7][D[0]] & number}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
-         `%r${P}`, Ds]
+      // (a native with all its arguments: the runtime's function, called here)
+      ? IsNative<D> extends true ? (As["length"] extends D[1]["length"] ? [`${A}${NativeCall<D, Vs, P>}`, `%r${P}`, Ds] : GenCallF<N, D, A, Vs, Ds, P, C>)
+      : GenCallF<N, D, A, Vs, Ds, P, C>
       : never
     : ["", "18", ""];
+type NativeCall<D extends Decl, Vs extends string[], P extends string> =
+  D[4] extends PairNatives
+    ? `  %np${P} = call { i64, i64 } @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n  %na${P} = extractvalue { i64, i64 } %np${P}, 0\n  %nb${P} = extractvalue { i64, i64 } %np${P}, 1\n  %r${P} = call i64 @tstc0.box(i64 %na${P}, i64 %nb${P})\n`
+    : `  %r${P} = call i64 @n_${D[4]}(${Join<ArgVals<Vs>, ", ">})\n`;
+type GenCallF<N extends string, D extends Decl, A extends string, Vs extends string[], Ds extends string, P extends string, C extends Ctx> =
+      [`${A}  %f${P} = load ptr, ptr @tstc_top\n  %top${P} = getelementptr inbounds i64, ptr %f${P}, i64 ${C[7][D[0]] & number}\n  store ptr %top${P}, ptr @tstc_top\n${StoreAll<Vs, `%f${P}`, `a${P}`>}${Defaults<D, `%f${P}`, P, { [K in keyof Vs]: 0 }>}  %c${P} = call { i64, i64 } @"${N}"(ptr %f${P})\n  store ptr %f${P}, ptr @tstc_top\n  %r${P} = extractvalue { i64, i64 } %c${P}, 0\n`,
+         `%r${P}`, Ds];
 
 type Defaults<D extends Decl, F extends string, P extends string, I extends 0[]> =
   I["length"] extends D[1]["length"] ? ""
@@ -885,9 +893,11 @@ type LibNatives = "iadd" | "isub" | "imul" | "idiv" | "irem" | "iand" | "ior" | 
 type PairNatives = "halloc" | "salloc" | "sappend" | "sappendv" | "scopy" | "s2bytes" | "s2runesl" | "ta2" | "srange"
   | "decoderune" | "shash128" | "clock_ms" | "pmap_get" | "cell_pmap_get";
 type BaseName<P extends string> = P extends `${string}/${infer R}` ? BaseName<R> : P;
+// (the natives declared once in each unit: NativeDecls)
+type NativeDecl<D extends Decl> = `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<ArgTypes<D[1]>, ", ">})\n`;
+type NativeDecls<Ds extends Decl[]> = Join<{ [K in keyof Ds]: IsNative<Ds[K]> extends true ? NativeDecl<Ds[K]> : "" }>;
 type NativeBody<D extends Decl> =
-  `${D[4] extends PairNatives ? `declare { i64, i64 } @n_${D[4]}(` : `declare i64 @n_${D[4]}(`}${Join<ArgTypes<D[1]>, ", ">})
-define internal { i64, i64 } @"${D[0]}$body"(ptr %env) {
+  `define internal { i64, i64 } @"${D[0]}$body"(ptr %env) {
 entry:
 ${Join<ArgLoads<D[1]>>}${D[4] extends PairNatives
   ? `  %p = call { i64, i64 } @n_${D[4]}(${Join<ArgRefs<D[1]>, ", ">})
@@ -1001,7 +1011,7 @@ type Units<Us extends [Decl, string][][], Ds extends Decl[], M, Names extends Fi
 type LastIndex<L extends any[]> = L extends [any, ...infer R] ? `${R["length"]}` : never;
 type Unit<G extends [Decl, string][], Ds extends Decl[], M, Names extends FileTables, Eff, FT, CT extends NoNames, Tail extends string> =
   { [K in keyof G]: G[K][0][0] }[number] extends infer Own
-    ? [ModuleHead, ...{ [K in keyof G]: AliasIR<G[K][0], M, Names, G[K][1], Eff, FT> },
+    ? [ModuleHead, NativeDecls<Ds>, ...{ [K in keyof G]: AliasIR<G[K][0], M, Names, G[K][1], Eff, FT> },
        Externs<Ds, NotIn<{ [K in keyof G]: CT[G[K][0][0]] | Handler<G[K][0], Names> }[number] | (Tail extends "" ? never : Ds[number][0]), Own>>, Tail]
     : never;
 // declarations of the aliases a unit calls that other units define
